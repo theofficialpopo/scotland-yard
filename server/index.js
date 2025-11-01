@@ -132,6 +132,29 @@ function assignStartingPositions(room) {
   }
 }
 
+// Filter game state for each player (hide Mr. X position when appropriate)
+function getFilteredRoomForPlayer(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
+
+  // If player is Mr. X or game hasn't started, send full state
+  if (!room.gameState || player?.role === 'mrX') {
+    return room;
+  }
+
+  // Clone the room to avoid modifying original
+  const filteredRoom = JSON.parse(JSON.stringify(room));
+
+  // Check if current round is a reveal round
+  const isRevealRound = room.gameState.revealRounds.includes(room.gameState.currentRound);
+
+  // Hide Mr. X position for detectives (unless it's a reveal round)
+  if (!isRevealRound) {
+    filteredRoom.gameState.mrX.position = null;
+  }
+
+  return filteredRoom;
+}
+
 // Clean up old/abandoned games
 function cleanupGames() {
   const now = Date.now();
@@ -160,8 +183,30 @@ function cleanupGames() {
   }
 }
 
+// Clean up old rate limit entries to prevent memory leak
+function cleanupRateLimits() {
+  const now = Date.now();
+  const maxAge = 60 * 60 * 1000; // 1 hour
+  let cleaned = 0;
+
+  for (const [key, timestamps] of rateLimits.entries()) {
+    // Remove entries where all timestamps are older than 1 hour
+    const hasRecentActivity = timestamps.some(t => now - t < maxAge);
+
+    if (!hasRecentActivity) {
+      rateLimits.delete(key);
+      cleaned++;
+    }
+  }
+
+  if (cleaned > 0) {
+    console.log(`[Cleanup] Removed ${cleaned} stale rate limit entries`);
+  }
+}
+
 // Run cleanup every 5 minutes
 setInterval(cleanupGames, 5 * 60 * 1000);
+setInterval(cleanupRateLimits, 5 * 60 * 1000);
 
 // Socket.IO connection handling with error handling wrapper
 io.on('connection', (socket) => {
@@ -416,9 +461,13 @@ io.on('connection', (socket) => {
     // Assign starting positions
     assignStartingPositions(room);
 
-    io.to(roomCode).emit('game:started', {
-      room,
-      message: 'Game started! All players have starting positions.'
+    // Send filtered game state to each player
+    room.players.forEach(player => {
+      const filteredRoom = getFilteredRoomForPlayer(room, player.id);
+      io.to(player.id).emit('game:started', {
+        room: filteredRoom,
+        message: 'Game started! All players have starting positions.'
+      });
     });
 
     console.log(`Game started in room ${roomCode} with ${room.players.length} players`);
@@ -505,16 +554,19 @@ io.on('connection', (socket) => {
       });
     }
 
-    // Broadcast updated game state
-    io.to(roomCode).emit('game:state:updated', {
-      room,
-      lastMove: {
-        player: currentPlayer.name,
-        from,
-        to,
-        ticketType,
-        timestamp: Date.now()
-      }
+    // Send filtered game state to each player
+    room.players.forEach(player => {
+      const filteredRoom = getFilteredRoomForPlayer(room, player.id);
+      io.to(player.id).emit('game:state:updated', {
+        room: filteredRoom,
+        lastMove: {
+          player: currentPlayer.name,
+          from,
+          to,
+          ticketType,
+          timestamp: Date.now()
+        }
+      });
     });
 
     console.log(`${currentPlayer.name} moved from ${from} to ${to} using ${ticketType}`);

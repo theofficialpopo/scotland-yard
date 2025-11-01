@@ -80,7 +80,8 @@ function App() {
   const handleCreateRoom = (name) => {
     setPlayerName(name);
     // Wait for lobby:joined before creating room (fixes race condition)
-    const unsubOnce = on('lobby:joined', () => {
+    let unsubOnce;
+    unsubOnce = on('lobby:joined', () => {
       emit('room:create', { playerName: name });
       if (unsubOnce) unsubOnce();
     });
@@ -91,7 +92,8 @@ function App() {
     setPlayerName(name);
     setRoomCode(code);
     // Wait for lobby:joined before joining room (fixes race condition)
-    const unsubOnce = on('lobby:joined', () => {
+    let unsubOnce;
+    unsubOnce = on('lobby:joined', () => {
       emit('room:join', { roomCode: code, playerName: name });
       if (unsubOnce) unsubOnce();
     });

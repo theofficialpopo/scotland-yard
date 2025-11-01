@@ -66,11 +66,21 @@ export function validateMove(move, player, gameState) {
   }
 
   // Check if destination is occupied (no two players on same station)
-  const isOccupied = gameState.players.some(p =>
-    p.id !== player.id && p.position === to
-  );
+  // Check if Mr. X is at the destination (unless the moving player IS Mr. X)
+  if (player.role !== 'mrX' && gameState.mrX.position === to) {
+    return { valid: false, error: 'Destination station is occupied' };
+  }
 
-  if (isOccupied) {
+  // Check if any detective is at the destination
+  const detectiveAtDestination = gameState.detectives.some((detective, index) => {
+    // Skip if this is the moving detective
+    if (player.role === 'detective' && player.detectiveIndex === index) {
+      return false;
+    }
+    return detective.position === to;
+  });
+
+  if (detectiveAtDestination) {
     return { valid: false, error: 'Destination station is occupied' };
   }
 
@@ -96,8 +106,10 @@ export function canDetectivesMove(gameState) {
     if (!station) return false;
 
     return station.connections.some(connectedStation => {
-      const isOccupied = gameState.players.some(p => p.position === connectedStation);
-      return !isOccupied;
+      // Check if Mr. X or any other detective is at this station
+      const isMrXThere = gameState.mrX.position === connectedStation;
+      const isDetectiveThere = gameState.detectives.some(d => d.position === connectedStation);
+      return !isMrXThere && !isDetectiveThere;
     });
   });
 }

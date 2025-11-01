@@ -159,7 +159,7 @@ function Board({ room, playerId, emit }) {
                 cx={pos.x}
                 cy={pos.y}
                 r="15"
-                fill={colors[i % colors.length]}
+                fill={colors[player.detectiveIndex % colors.length]}
                 stroke="#fff"
                 strokeWidth="2"
                 className="player-piece"

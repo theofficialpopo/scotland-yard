@@ -130,32 +130,413 @@ export const stations = {
 
 // Connection types between stations
 // Format: { from: station, to: station, types: [array of ticket types that work] }
+// Connections are bidirectional by default (checked in helper functions)
 export const connections = [
-  // From station 1
+  // Station 1 connections
   { from: 1, to: 8, types: [TICKET_TYPES.TAXI] },
   { from: 1, to: 9, types: [TICKET_TYPES.TAXI] },
 
-  // From station 8
+  // Station 8 connections
+  { from: 8, to: 9, types: [TICKET_TYPES.TAXI] },
   { from: 8, to: 18, types: [TICKET_TYPES.BUS] },
   { from: 8, to: 19, types: [TICKET_TYPES.TAXI] },
 
-  // From station 9
+  // Station 9 connections
   { from: 9, to: 19, types: [TICKET_TYPES.BUS] },
   { from: 9, to: 20, types: [TICKET_TYPES.TAXI] },
 
-  // From station 13 (start)
+  // Station 13 (start) connections
   { from: 13, to: 23, types: [TICKET_TYPES.TAXI, TICKET_TYPES.BUS] },
   { from: 13, to: 24, types: [TICKET_TYPES.TAXI] },
   { from: 13, to: 14, types: [TICKET_TYPES.TAXI] },
   { from: 13, to: 46, types: [TICKET_TYPES.UNDERGROUND] },
 
-  // Continue with other connections...
-  // For MVP, this is a simplified subset. Full map will have all 199 stations
+  // Station 14 connections
+  { from: 14, to: 15, types: [TICKET_TYPES.TAXI] },
+  { from: 14, to: 23, types: [TICKET_TYPES.TAXI] },
+  { from: 14, to: 25, types: [TICKET_TYPES.BUS] },
 
-  // Underground connections (major stations)
+  // Station 15 connections
+  { from: 15, to: 16, types: [TICKET_TYPES.TAXI] },
+  { from: 15, to: 26, types: [TICKET_TYPES.BUS] },
+  { from: 15, to: 28, types: [TICKET_TYPES.BUS] },
+  { from: 15, to: 29, types: [TICKET_TYPES.TAXI] },
+
+  // Station 16 connections
+  { from: 16, to: 28, types: [TICKET_TYPES.TAXI] },
+  { from: 16, to: 29, types: [TICKET_TYPES.TAXI] },
+
+  // Station 18 connections
+  { from: 18, to: 31, types: [TICKET_TYPES.TAXI] },
+  { from: 18, to: 43, types: [TICKET_TYPES.TAXI] },
+
+  // Station 19 connections
+  { from: 19, to: 32, types: [TICKET_TYPES.TAXI] },
+
+  // Station 20 connections
+  { from: 20, to: 33, types: [TICKET_TYPES.TAXI] },
+
+  // Station 23 connections
+  { from: 23, to: 37, types: [TICKET_TYPES.TAXI] },
+
+  // Station 24 connections
+  { from: 24, to: 37, types: [TICKET_TYPES.BUS] },
+  { from: 24, to: 38, types: [TICKET_TYPES.TAXI] },
+
+  // Station 25 connections
+  { from: 25, to: 38, types: [TICKET_TYPES.BUS] },
+  { from: 25, to: 39, types: [TICKET_TYPES.TAXI] },
+
+  // Station 26 (start) connections
+  { from: 26, to: 27, types: [TICKET_TYPES.TAXI] },
+  { from: 26, to: 39, types: [TICKET_TYPES.BUS] },
+
+  // Station 27 connections
+  { from: 27, to: 28, types: [TICKET_TYPES.TAXI] },
+  { from: 27, to: 40, types: [TICKET_TYPES.TAXI] },
+
+  // Station 28 connections
+  { from: 28, to: 41, types: [TICKET_TYPES.TAXI] },
+
+  // Station 29 (start) connections
+  { from: 29, to: 41, types: [TICKET_TYPES.TAXI] },
+  { from: 29, to: 42, types: [TICKET_TYPES.BUS] },
+
+  // Station 31 connections
+  { from: 31, to: 43, types: [TICKET_TYPES.TAXI] },
+  { from: 31, to: 44, types: [TICKET_TYPES.TAXI] },
+
+  // Station 32 connections
+  { from: 32, to: 33, types: [TICKET_TYPES.TAXI] },
+  { from: 32, to: 44, types: [TICKET_TYPES.TAXI] },
+  { from: 32, to: 45, types: [TICKET_TYPES.TAXI] },
+
+  // Station 33 connections
+  { from: 33, to: 46, types: [TICKET_TYPES.TAXI] },
+
+  // Station 34 (start) connections
+  { from: 34, to: 47, types: [TICKET_TYPES.TAXI] },
+  { from: 34, to: 48, types: [TICKET_TYPES.TAXI] },
+
+  // Station 37 connections
+  { from: 37, to: 50, types: [TICKET_TYPES.TAXI] },
+
+  // Station 38 connections
+  { from: 38, to: 50, types: [TICKET_TYPES.TAXI] },
+  { from: 38, to: 51, types: [TICKET_TYPES.BUS] },
+
+  // Station 39 connections
+  { from: 39, to: 51, types: [TICKET_TYPES.TAXI] },
+  { from: 39, to: 52, types: [TICKET_TYPES.TAXI] },
+
+  // Station 40 connections
+  { from: 40, to: 52, types: [TICKET_TYPES.BUS] },
+  { from: 40, to: 53, types: [TICKET_TYPES.TAXI] },
+
+  // Station 41 connections
+  { from: 41, to: 54, types: [TICKET_TYPES.TAXI] },
+
+  // Station 42 connections
+  { from: 42, to: 56, types: [TICKET_TYPES.TAXI] },
+  { from: 42, to: 72, types: [TICKET_TYPES.BUS] },
+
+  // Station 43 connections
+  { from: 43, to: 57, types: [TICKET_TYPES.TAXI] },
+
+  // Station 44 connections
+  { from: 44, to: 58, types: [TICKET_TYPES.TAXI] },
+
+  // Station 45 connections
+  { from: 45, to: 46, types: [TICKET_TYPES.TAXI] },
+  { from: 45, to: 58, types: [TICKET_TYPES.BUS] },
+  { from: 45, to: 60, types: [TICKET_TYPES.TAXI] },
+
+  // Station 46 connections
+  { from: 46, to: 61, types: [TICKET_TYPES.TAXI] },
+
+  // Station 47 connections
+  { from: 47, to: 62, types: [TICKET_TYPES.TAXI] },
+
+  // Station 48 connections
+  { from: 48, to: 62, types: [TICKET_TYPES.BUS] },
+  { from: 48, to: 63, types: [TICKET_TYPES.TAXI] },
+
+  // Station 50 (start) connections
+  { from: 50, to: 49, types: [TICKET_TYPES.TAXI] },
+
+  // Station 51 connections
+  { from: 51, to: 67, types: [TICKET_TYPES.TAXI] },
+  { from: 51, to: 68, types: [TICKET_TYPES.TAXI] },
+
+  // Station 52 connections
+  { from: 52, to: 67, types: [TICKET_TYPES.BUS] },
+  { from: 52, to: 69, types: [TICKET_TYPES.TAXI] },
+
+  // Station 53 (start) connections
+  { from: 53, to: 54, types: [TICKET_TYPES.TAXI] },
+  { from: 53, to: 69, types: [TICKET_TYPES.BUS] },
+
+  // Station 54 connections
+  { from: 54, to: 70, types: [TICKET_TYPES.TAXI] },
+
+  // Station 56 connections
+  { from: 56, to: 91, types: [TICKET_TYPES.BUS] },
+
+  // Station 57 connections
+  { from: 57, to: 73, types: [TICKET_TYPES.TAXI] },
+
+  // Station 58 connections
+  { from: 58, to: 74, types: [TICKET_TYPES.BUS] },
+  { from: 58, to: 75, types: [TICKET_TYPES.TAXI] },
+
+  // Station 60 connections
+  { from: 60, to: 76, types: [TICKET_TYPES.TAXI] },
+
+  // Station 61 connections
+  { from: 61, to: 76, types: [TICKET_TYPES.TAXI] },
+  { from: 61, to: 78, types: [TICKET_TYPES.BUS] },
+
+  // Station 62 connections
+  { from: 62, to: 79, types: [TICKET_TYPES.TAXI] },
+
+  // Station 63 connections
+  { from: 63, to: 79, types: [TICKET_TYPES.TAXI] },
+  { from: 63, to: 80, types: [TICKET_TYPES.TAXI] },
+  { from: 63, to: 81, types: [TICKET_TYPES.BUS] },
+
+  // Station 67 connections
+  { from: 67, to: 82, types: [TICKET_TYPES.TAXI] },
+  { from: 67, to: 84, types: [TICKET_TYPES.TAXI] },
+
+  // Station 68 connections
+  { from: 68, to: 85, types: [TICKET_TYPES.TAXI] },
+
+  // Station 69 connections
+  { from: 69, to: 86, types: [TICKET_TYPES.TAXI] },
+
+  // Station 70 connections
+  { from: 70, to: 87, types: [TICKET_TYPES.TAXI] },
+
+  // Station 72 connections
+  { from: 72, to: 90, types: [TICKET_TYPES.TAXI] },
+  { from: 72, to: 91, types: [TICKET_TYPES.BUS] },
+
+  // Station 73 connections
+  { from: 73, to: 92, types: [TICKET_TYPES.TAXI] },
+
+  // Station 74 connections
+  { from: 74, to: 92, types: [TICKET_TYPES.TAXI] },
+
+  // Station 75 connections
+  { from: 75, to: 94, types: [TICKET_TYPES.TAXI] },
+
+  // Station 76 connections (no new connections, already defined)
+
+  // Station 78 connections
+  { from: 78, to: 79, types: [TICKET_TYPES.TAXI] },
+  { from: 78, to: 97, types: [TICKET_TYPES.BUS] },
+
+  // Station 79 connections (all already defined)
+
+  // Station 80 connections
+  { from: 80, to: 100, types: [TICKET_TYPES.TAXI] },
+
+  // Station 81 connections
+  { from: 81, to: 82, types: [TICKET_TYPES.BUS] },
+  { from: 81, to: 100, types: [TICKET_TYPES.TAXI] },
+
+  // Station 82 connections
+  { from: 82, to: 101, types: [TICKET_TYPES.TAXI] },
+  { from: 82, to: 140, types: [TICKET_TYPES.UNDERGROUND] },
+
+  // Station 84 connections
+  { from: 84, to: 85, types: [TICKET_TYPES.TAXI] },
+
+  // Station 85 connections
+  { from: 85, to: 103, types: [TICKET_TYPES.TAXI] },
+
+  // Station 86 connections
+  { from: 86, to: 116, types: [TICKET_TYPES.BUS] },
+  { from: 86, to: 117, types: [TICKET_TYPES.TAXI] },
+
+  // Station 87 connections
+  { from: 87, to: 88, types: [TICKET_TYPES.TAXI] },
+
+  // Station 88 connections
+  { from: 88, to: 117, types: [TICKET_TYPES.BUS] },
+
+  // Station 90 connections
+  { from: 90, to: 91, types: [TICKET_TYPES.TAXI] },
+  { from: 90, to: 105, types: [TICKET_TYPES.TAXI] },
+
+  // Station 91 (start) connections
+  { from: 91, to: 105, types: [TICKET_TYPES.TAXI] },
+
+  // Station 92 connections (all already defined)
+
+  // Station 94 (start) connections (all already defined)
+
+  // Station 97 connections
+  { from: 97, to: 109, types: [TICKET_TYPES.TAXI] },
+
+  // Station 100 connections
+  { from: 100, to: 112, types: [TICKET_TYPES.TAXI] },
+
+  // Station 101 connections
+  { from: 101, to: 114, types: [TICKET_TYPES.TAXI] },
+
+  // Station 103 (start) connections
+  { from: 103, to: 112, types: [TICKET_TYPES.BUS] },
+
+  // Station 105 connections
+  { from: 105, to: 106, types: [TICKET_TYPES.TAXI] },
+  { from: 105, to: 108, types: [TICKET_TYPES.TAXI] },
+
+  // Station 106 connections
+  { from: 106, to: 116, types: [TICKET_TYPES.TAXI] },
+
+  // Station 108 connections
+  { from: 108, to: 116, types: [TICKET_TYPES.TAXI] },
+  { from: 108, to: 117, types: [TICKET_TYPES.BUS] },
+
+  // Station 109 connections
+  { from: 109, to: 124, types: [TICKET_TYPES.TAXI] },
+
+  // Station 112 (start) connections (all already defined)
+
+  // Station 114 connections
+  { from: 114, to: 132, types: [TICKET_TYPES.TAXI] },
+
+  // Station 115 connections
+  { from: 115, to: 126, types: [TICKET_TYPES.TAXI] },
+  { from: 115, to: 127, types: [TICKET_TYPES.TAXI] },
+
+  // Station 116 connections
+  { from: 116, to: 118, types: [TICKET_TYPES.TAXI] },
+
+  // Station 117 (start) connections
+  { from: 117, to: 129, types: [TICKET_TYPES.TAXI] },
+
+  // Station 118 connections
+  { from: 118, to: 129, types: [TICKET_TYPES.BUS] },
+  { from: 118, to: 134, types: [TICKET_TYPES.TAXI] },
+
+  // Station 124 connections
+  { from: 124, to: 130, types: [TICKET_TYPES.TAXI] },
+  { from: 124, to: 138, types: [TICKET_TYPES.BUS] },
+
+  // Station 126 connections
+  { from: 126, to: 127, types: [TICKET_TYPES.TAXI] },
+  { from: 126, to: 140, types: [TICKET_TYPES.BUS] },
+
+  // Station 127 connections
+  { from: 127, to: 134, types: [TICKET_TYPES.TAXI] },
+
+  // Station 129 connections
+  { from: 129, to: 142, types: [TICKET_TYPES.TAXI] },
+
+  // Station 130 connections
+  { from: 130, to: 131, types: [TICKET_TYPES.TAXI] },
+  { from: 130, to: 139, types: [TICKET_TYPES.TAXI] },
+
+  // Station 131 connections
+  { from: 131, to: 114, types: [TICKET_TYPES.BUS] },
+
+  // Station 132 (start) connections
+  { from: 132, to: 140, types: [TICKET_TYPES.TAXI] },
+
+  // Station 134 connections
+  { from: 134, to: 141, types: [TICKET_TYPES.TAXI] },
+
+  // Station 138 (start) connections
+  { from: 138, to: 150, types: [TICKET_TYPES.TAXI] },
+
+  // Station 139 connections
+  { from: 139, to: 153, types: [TICKET_TYPES.TAXI] },
+
+  // Station 140 connections
+  { from: 140, to: 154, types: [TICKET_TYPES.TAXI] },
+
+  // Station 141 (start) connections
+  { from: 141, to: 142, types: [TICKET_TYPES.TAXI] },
+
+  // Station 142 connections
+  { from: 142, to: 143, types: [TICKET_TYPES.TAXI] },
+  { from: 142, to: 158, types: [TICKET_TYPES.BUS] },
+
+  // Station 143 connections
+  { from: 143, to: 158, types: [TICKET_TYPES.TAXI] },
+
+  // Station 150 connections (all already defined)
+
+  // Station 153 connections
+  { from: 153, to: 154, types: [TICKET_TYPES.TAXI] },
+  { from: 153, to: 166, types: [TICKET_TYPES.TAXI] },
+
+  // Station 154 connections
+  { from: 154, to: 155, types: [TICKET_TYPES.TAXI] },
+
+  // Station 155 (start) connections
+  { from: 155, to: 156, types: [TICKET_TYPES.TAXI] },
+  { from: 155, to: 167, types: [TICKET_TYPES.BUS] },
+
+  // Station 156 connections
+  { from: 156, to: 157, types: [TICKET_TYPES.TAXI] },
+  { from: 156, to: 169, types: [TICKET_TYPES.TAXI] },
+
+  // Station 157 connections
+  { from: 157, to: 158, types: [TICKET_TYPES.TAXI] },
+  { from: 157, to: 170, types: [TICKET_TYPES.BUS] },
+
+  // Station 158 connections (all already defined)
+
+  // Station 166 connections
+  { from: 166, to: 183, types: [TICKET_TYPES.TAXI] },
+
+  // Station 167 connections
+  { from: 167, to: 168, types: [TICKET_TYPES.TAXI] },
+
+  // Station 168 connections
+  { from: 168, to: 184, types: [TICKET_TYPES.TAXI] },
+
+  // Station 169 connections
+  { from: 169, to: 184, types: [TICKET_TYPES.TAXI] },
+
+  // Station 170 connections
+  { from: 170, to: 185, types: [TICKET_TYPES.TAXI] },
+
+  // Station 174 (start) connections
+  { from: 174, to: 175, types: [TICKET_TYPES.TAXI] },
+
+  // Station 175 connections (all already defined)
+
+  // Station 183 connections
+  { from: 183, to: 185, types: [TICKET_TYPES.TAXI] },
+
+  // Station 184 connections
+  { from: 184, to: 185, types: [TICKET_TYPES.TAXI] },
+  { from: 184, to: 196, types: [TICKET_TYPES.BUS] },
+
+  // Station 185 connections (all already defined)
+
+  // Station 194 (start) connections
+  { from: 194, to: 195, types: [TICKET_TYPES.TAXI] },
+
+  // Station 195 connections
+  { from: 195, to: 197, types: [TICKET_TYPES.TAXI] },
+
+  // Station 196 connections
+  { from: 196, to: 197, types: [TICKET_TYPES.TAXI] },
+
+  // Station 197 (start) connections (all already defined)
+
+  // Underground connections (major hubs)
   { from: 13, to: 46, types: [TICKET_TYPES.UNDERGROUND] },
   { from: 46, to: 74, types: [TICKET_TYPES.UNDERGROUND] },
   { from: 74, to: 89, types: [TICKET_TYPES.UNDERGROUND] },
+  { from: 89, to: 128, types: [TICKET_TYPES.UNDERGROUND] },
+  { from: 67, to: 111, types: [TICKET_TYPES.UNDERGROUND] },
+  { from: 111, to: 153, types: [TICKET_TYPES.UNDERGROUND] },
 
   // Ferry connections (Mr. X only with black ticket)
   { from: 108, to: 115, types: [TICKET_TYPES.FERRY] },
