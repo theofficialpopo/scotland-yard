@@ -12,7 +12,7 @@ function Board({ room, playerId, emit }) {
     );
   }
 
-  const currentPlayer = room.players[room.gameState.currentPlayer];
+  const currentPlayer = room.players[room.gameState.currentPlayerIndex];
   const isMyTurn = currentPlayer?.id === playerId;
   const myPlayer = room.players.find(p => p.id === playerId);
 
@@ -29,10 +29,10 @@ function Board({ room, playerId, emit }) {
   const handleMove = (ticketType) => {
     if (!selectedStation || !isMyTurn) return;
 
-    // Get current player's position (simplified for MVP)
+    // Get current player's position using detectiveIndex
     const currentPosition = myPlayer.role === 'mrX'
       ? room.gameState.mrX.position
-      : room.gameState.detectives[parseInt(myPlayer.role.replace('detective', '')) - 1]?.position;
+      : room.gameState.detectives[myPlayer.detectiveIndex]?.position;
 
     if (!currentPosition) {
       console.log('No current position set');
@@ -125,7 +125,7 @@ function Board({ room, playerId, emit }) {
           );
         })}
 
-        {/* Render player pieces (simplified for MVP) */}
+        {/* Render player pieces */}
         {room.players.map((player, i) => {
           if (player.role === 'mrX' && room.gameState.mrX.position) {
             const pos = stations[room.gameState.mrX.position];
@@ -143,9 +143,8 @@ function Board({ room, playerId, emit }) {
                 className="player-piece"
               />
             );
-          } else if (player.role?.startsWith('detective')) {
-            const detectiveIndex = parseInt(player.role.replace('detective', '')) - 1;
-            const detectivePos = room.gameState.detectives[detectiveIndex]?.position;
+          } else if (player.role === 'detective' && player.detectiveIndex !== null) {
+            const detectivePos = room.gameState.detectives[player.detectiveIndex]?.position;
 
             if (!detectivePos) return null;
 

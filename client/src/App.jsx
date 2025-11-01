@@ -44,10 +44,26 @@ function App() {
       setError(null);
     });
 
+    // Listen for game state updates (after moves)
+    const unsubGameStateUpdated = on('game:state:updated', ({ room, lastMove }) => {
+      console.log('Game state updated:', lastMove);
+      setRoom(room);
+      setError(null); // Clear any previous errors on successful move
+    });
+
+    // Listen for game over
+    const unsubGameOver = on('game:over', ({ winner, reason }) => {
+      console.log('Game over:', winner, reason);
+      alert(`Game Over! ${winner === 'detectives' ? 'Detectives' : 'Mister X'} won! ${reason}`);
+      // Room state will be updated via game:state:updated
+    });
+
     // Listen for errors
-    const unsubError = on('error', ({ message }) => {
-      console.error('Server error:', message);
+    const unsubError = on('error', ({ message, code }) => {
+      console.error('Server error:', code, message);
       setError(message);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setError(null), 5000);
     });
 
     return () => {
@@ -55,25 +71,31 @@ function App() {
       unsubLobbyJoined && unsubLobbyJoined();
       unsubRoomUpdated && unsubRoomUpdated();
       unsubGameStarted && unsubGameStarted();
+      unsubGameStateUpdated && unsubGameStateUpdated();
+      unsubGameOver && unsubGameOver();
       unsubError && unsubError();
     };
   }, [socket, on]);
 
   const handleCreateRoom = (name) => {
     setPlayerName(name);
-    emit('join:lobby', { playerName: name });
-    setTimeout(() => {
+    // Wait for lobby:joined before creating room (fixes race condition)
+    const unsubOnce = on('lobby:joined', () => {
       emit('room:create', { playerName: name });
-    }, 100);
+      if (unsubOnce) unsubOnce();
+    });
+    emit('join:lobby', { playerName: name });
   };
 
   const handleJoinRoom = (code, name) => {
     setPlayerName(name);
     setRoomCode(code);
-    emit('join:lobby', { playerName: name });
-    setTimeout(() => {
+    // Wait for lobby:joined before joining room (fixes race condition)
+    const unsubOnce = on('lobby:joined', () => {
       emit('room:join', { roomCode: code, playerName: name });
-    }, 100);
+      if (unsubOnce) unsubOnce();
+    });
+    emit('join:lobby', { playerName: name });
     setGameState('waiting');
   };
 
