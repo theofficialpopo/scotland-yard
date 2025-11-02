@@ -143,11 +143,13 @@ export function canDetectivesMove(gameState) {
 
     // Check if any adjacent station is reachable and unoccupied
     for (const [stationId, requiredTicketTypes] of adjacentStations) {
-      // Check if station is occupied
-      const isMrXThere = gameState.mrX.position === stationId;
-      const isDetectiveThere = gameState.detectives.some(d => d.position === stationId);
+      // IMPORTANT: Detectives CAN move to Mr. X's position (that's how they capture him!)
+      // Only check if another detective is occupying the station
+      const isOtherDetectiveThere = gameState.detectives.some((d, idx) =>
+        d.position === stationId && idx !== gameState.detectives.indexOf(detective)
+      );
 
-      if (isMrXThere || isDetectiveThere) continue;
+      if (isOtherDetectiveThere) continue;
 
       // Check if detective has at least one ticket type that can reach this station
       const canReach = Array.from(requiredTicketTypes).some(ticketType => {

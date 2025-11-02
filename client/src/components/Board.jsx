@@ -60,14 +60,10 @@ function Board({ room, playerId, emit }) {
     // Get all occupied positions (for collision detection)
     const occupiedPositions = new Set();
 
-    // For detectives, mark all detective positions and Mr. X position as occupied
+    // For detectives, mark only other detective positions as occupied
+    // IMPORTANT: Detectives CAN move to Mr. X's position to capture him!
     if (myPlayer.role === 'detective') {
-      // Add Mr. X position
-      if (room.gameState.mrX.position) {
-        occupiedPositions.add(room.gameState.mrX.position);
-      }
-
-      // Add other detectives' positions
+      // Add other detectives' positions (but NOT Mr. X's position!)
       room.gameState.detectives.forEach((detective, index) => {
         if (index !== myPlayer.detectiveIndex && detective.position) {
           occupiedPositions.add(detective.position);
