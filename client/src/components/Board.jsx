@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { stations, connections, stationTicketTypes } from '../data/londonMap';
 import StationMarker from './StationMarker';
+import TicketSelectionModal from './TicketSelectionModal';
 
 function Board({ room, playerId, emit }) {
   const [selectedStation, setSelectedStation] = useState(null);
@@ -166,11 +167,6 @@ function Board({ room, playerId, emit }) {
 
   return (
     <div className="board-container">
-      <div style={{ marginBottom: '15px' }}>
-        <strong>Current Turn:</strong> {currentPlayer?.name}
-        {isMyTurn && <span style={{ color: 'green', marginLeft: '10px' }}>(Your Turn!)</span>}
-      </div>
-
       <svg
         viewBox="100 0 800 750"
         style={{
@@ -373,98 +369,43 @@ function Board({ room, playerId, emit }) {
         })}
       </svg>
 
-      {selectedStation && isMyTurn && currentPosition && (
-        <div style={{ marginTop: '15px' }}>
-          <p><strong>Selected Station:</strong> {selectedStation}</p>
+      {/* Ticket Selection Modal */}
+      <TicketSelectionModal
+        selectedStation={selectedStation}
+        validTickets={selectedStation && currentPosition ? getValidTicketTypes(currentPosition, selectedStation) : []}
+        currentTickets={
+          myPlayer?.role === 'mrX'
+            ? room.gameState.mrX.tickets
+            : room.gameState.detectives[myPlayer?.detectiveIndex]?.tickets || {}
+        }
+        isMrX={myPlayer?.role === 'mrX'}
+        doubleMoves={room.gameState.mrX?.doubleMoves || 0}
+        doubleMoveInProgress={room.gameState.doubleMoveInProgress}
+        useDoubleMove={useDoubleMove}
+        onDoubleMoveToggle={setUseDoubleMove}
+        onTicketSelect={handleMove}
+        onCancel={() => {
+          setSelectedStation(null);
+          setUseDoubleMove(false);
+        }}
+      />
 
-          {/* Double-move option for Mr. X */}
-          {myPlayer?.role === 'mrX' && room.gameState.mrX.doubleMoves > 0 && !room.gameState.doubleMoveInProgress && (
-            <div style={{ marginBottom: '10px', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={useDoubleMove}
-                  onChange={(e) => setUseDoubleMove(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span style={{ fontWeight: 'bold' }}>
-                  Use Double-Move Card ({room.gameState.mrX.doubleMoves} remaining)
-                </span>
-              </label>
-              <p style={{ fontSize: '12px', color: '#666', margin: '5px 0 0 26px' }}>
-                Move twice in a row this turn
-              </p>
-            </div>
-          )}
-
-          {/* Show indicator if double-move is in progress */}
-          {room.gameState.doubleMoveInProgress && isMyTurn && (
-            <div style={{ marginBottom: '10px', padding: '10px', background: '#fff3cd', borderRadius: '4px', border: '1px solid #ffc107' }}>
-              <strong>🎯 Double-Move Active!</strong> Make your second move.
-            </div>
-          )}
-
-          <p>Choose a ticket type:</p>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            {(() => {
-              const validTickets = getValidTicketTypes(currentPosition, selectedStation);
-              const currentTickets = myPlayer?.role === 'mrX'
-                ? room.gameState.mrX.tickets
-                : room.gameState.detectives[myPlayer.detectiveIndex]?.tickets;
-
-              return (
-                <>
-                  <button
-                    className="button ticket-taxi"
-                    onClick={() => handleMove('taxi')}
-                    disabled={!validTickets.includes('taxi') || !currentTickets?.taxi}
-                    style={{ opacity: validTickets.includes('taxi') && currentTickets?.taxi ? 1 : 0.5 }}
-                  >
-                    Taxi ({currentTickets?.taxi || 0})
-                  </button>
-                  <button
-                    className="button ticket-bus"
-                    onClick={() => handleMove('bus')}
-                    disabled={!validTickets.includes('bus') || !currentTickets?.bus}
-                    style={{ opacity: validTickets.includes('bus') && currentTickets?.bus ? 1 : 0.5 }}
-                  >
-                    Bus ({currentTickets?.bus || 0})
-                  </button>
-                  <button
-                    className="button ticket-underground"
-                    onClick={() => handleMove('underground')}
-                    disabled={!validTickets.includes('underground') || !currentTickets?.underground}
-                    style={{ opacity: validTickets.includes('underground') && currentTickets?.underground ? 1 : 0.5 }}
-                  >
-                    Underground ({currentTickets?.underground || 0})
-                  </button>
-                  {myPlayer?.role === 'mrX' && (
-                    <button
-                      className="button ticket-black"
-                      onClick={() => handleMove('black')}
-                      disabled={!currentTickets?.black}
-                      style={{ opacity: currentTickets?.black ? 1 : 0.5 }}
-                    >
-                      Black ({currentTickets?.black || 0})
-                    </button>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-          <button
-            className="button"
-            onClick={() => setSelectedStation(null)}
-            style={{ marginTop: '10px', background: '#6c757d' }}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {!isMyTurn && (
-        <div style={{ marginTop: '15px', color: '#666' }}>
-          <p>Waiting for {currentPlayer?.name} to make a move...</p>
+      {!isMyTurn && currentPlayer && (
+        <div style={{
+          position: 'fixed',
+          bottom: '30px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(30, 25, 20, 0.95)',
+          border: '2px solid #8B4513',
+          borderRadius: '8px',
+          padding: '15px 30px',
+          color: '#ccc',
+          fontSize: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+          zIndex: 50
+        }}>
+          Waiting for <strong style={{ color: '#FFD700' }}>{currentPlayer.name}</strong> to make a move...
         </div>
       )}
     </div>
