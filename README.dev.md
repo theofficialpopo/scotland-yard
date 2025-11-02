@@ -42,6 +42,18 @@ cd client
 npm install
 ```
 
+3. **Configure Environment Variables:**
+```bash
+cd server
+cp .env.example .env
+```
+
+**Required environment variables:**
+- `PORT` - Server port (default: 3001)
+- `CORS_ORIGIN` - Allowed client origins (comma-separated)
+
+The server will **fail to start** if these required variables are not set. This is a security feature to prevent misconfiguration.
+
 #### Running the Application
 
 1. **Start the Server** (Terminal 1):
@@ -50,6 +62,10 @@ cd server
 npm run dev
 ```
 Server will run on http://localhost:3001
+
+**Server will validate environment variables on startup:**
+- ✅ If all required vars are set, server starts normally
+- ❌ If any required vars are missing, server exits with clear error message
 
 2. **Start the Client** (Terminal 2):
 ```bash
@@ -175,11 +191,49 @@ Should return:
 - [ ] Win condition detection
 - [ ] Full 199-station London map
 
+### Security Features
+
+**Environment Variable Validation:**
+- Server validates required environment variables on startup
+- Fails fast with clear error messages if misconfigured
+- Prevents production deployments with missing configuration
+
+**HTTP Security Headers (Helmet.js):**
+- Content Security Policy (CSP) configured
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+- X-XSS-Protection enabled
+- Strict-Transport-Security (HSTS)
+- Referrer-Policy configured
+
+**Rate Limiting:**
+- HTTP endpoints: 100 requests per 15 minutes per IP
+- Socket.IO events: Custom rate limiting per connection
+- Prevents DoS attacks
+
+**Request Size Limits:**
+- JSON payloads limited to 10kb
+- URL-encoded payloads limited to 10kb
+- Socket.IO messages limited to 1MB
+
+**Other Security Measures:**
+- CORS whitelist protection
+- Cryptographically secure room code generation
+- Input validation and sanitization
+- Proxy trust configuration for accurate IP detection
+- X-Powered-By header disabled
+
 ### Troubleshooting
 
 **Server won't start:**
 - Check if port 3001 is available
 - Run `npm install` in server directory
+- **Check environment variables** - Server now requires PORT and CORS_ORIGIN to be set
+
+**"Missing required environment variables" error:**
+- Copy `.env.example` to `.env` in the server directory
+- Set PORT=3001 and CORS_ORIGIN=http://localhost:5173
+- Ensure .env file is in the correct directory
 
 **Client won't start:**
 - Check if port 5173 is available
@@ -187,13 +241,18 @@ Should return:
 
 **Socket connection failed:**
 - Ensure server is running first
-- Check CORS_ORIGIN in server/.env
+- Check CORS_ORIGIN in server/.env includes your client URL
 - Check browser console for errors
 
 **Players can't join room:**
 - Verify room code is correct (case-sensitive)
 - Check server logs for errors
 - Ensure server is running
+
+**Rate limit errors:**
+- Wait 15 minutes for HTTP rate limit to reset
+- Check if you're making too many requests in development
+- Consider adjusting rate limits in server/index.js for development
 
 ### Contributing
 
