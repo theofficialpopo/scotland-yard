@@ -15,16 +15,16 @@ export const CITY_CONFIGS = {
     center: [-0.1278, 51.5074],
 
     // Southwest and Northeast corner bounds [longitude, latitude]
-    // Compact 1.5km x 1.5km area for optimal performance
+    // 3km x 3km area for optimal gameplay and performance
     bounds: [
-      [-0.1386, 51.5006],  // Southwest corner
-      [-0.1170, 51.5141]   // Northeast corner
+      [-0.1493, 51.4939],  // Southwest corner
+      [-0.1063, 51.5208]   // Northeast corner
     ],
 
     // Zoom levels
-    zoom: 14.5,      // Default zoom (closer for smaller area)
-    minZoom: 14,     // Prevent zooming out too far
-    maxZoom: 17,     // Allow closer zoom for detail
+    zoom: 13.5,      // Default zoom
+    minZoom: 12.5,   // Allow some zoom out
+    maxZoom: 16,     // Allow closer zoom for detail
 
     // Visual settings
     style: 'mapbox://styles/mapbox/streets-v12',  // Standard streets map
@@ -47,9 +47,9 @@ export const CITY_CONFIGS = {
       [-73.9971, 40.7195]   // Northeast
     ],
 
-    zoom: 14.5,
-    minZoom: 14,
-    maxZoom: 17,
+    zoom: 13.5,
+    minZoom: 12.5,
+    maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
 
@@ -70,9 +70,9 @@ export const CITY_CONFIGS = {
       [2.3625, 48.8633]    // Northeast
     ],
 
-    zoom: 14.5,
-    minZoom: 14,
-    maxZoom: 17,
+    zoom: 13.5,
+    minZoom: 12.5,
+    maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
 
@@ -93,9 +93,9 @@ export const CITY_CONFIGS = {
       [13.4161, 52.5267]   // Northeast
     ],
 
-    zoom: 14.5,
-    minZoom: 14,
-    maxZoom: 17,
+    zoom: 13.5,
+    minZoom: 12.5,
+    maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
 
@@ -116,9 +116,9 @@ export const CITY_CONFIGS = {
       [139.7774, 35.6829]   // Northeast
     ],
 
-    zoom: 14.5,
-    minZoom: 14,
-    maxZoom: 17,
+    zoom: 13.5,
+    minZoom: 12.5,
+    maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
 
