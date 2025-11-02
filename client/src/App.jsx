@@ -52,6 +52,7 @@ function App() {
       console.log('Game started:', message);
       setRoom(room);
       setGameState('playing');
+      setGameEndData(null); // Clear game end data for rematch
       setError(null);
     });
     cleanupFunctions.current.push(unsubGameStarted);
@@ -138,6 +139,13 @@ function App() {
     setRoomCode(null);
     setRoom(null);
     setError(null);
+    setGameEndData(null);
+  };
+
+  const handleRematch = () => {
+    if (roomCode) {
+      emit('game:rematch', { roomCode });
+    }
   };
 
   return (
@@ -424,6 +432,7 @@ function App() {
           reason={gameEndData.reason}
           moveHistory={gameEndData.moveHistory}
           finalRound={gameEndData.finalRound}
+          onRematch={handleRematch}
           onReturnToLobby={() => {
             setGameEndData(null);
             handleLeaveRoom();

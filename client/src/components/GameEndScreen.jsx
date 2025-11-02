@@ -17,7 +17,7 @@ const TICKET_COLORS = {
   black: '#1a1a1a'
 };
 
-function GameEndScreen({ winner, reason, moveHistory = [], finalRound, onReturnToLobby }) {
+function GameEndScreen({ winner, reason, moveHistory = [], finalRound, onReturnToLobby, onRematch }) {
   return (
     <div style={{
       position: 'fixed',
@@ -172,33 +172,61 @@ function GameEndScreen({ winner, reason, moveHistory = [], finalRound, onReturnT
           )}
         </div>
 
-        {/* Return to Lobby Button */}
-        <button
-          onClick={onReturnToLobby}
-          style={{
-            width: '100%',
-            padding: '15px',
-            background: '#4CAF50',
-            color: '#fff',
-            border: '2px solid #8B4513',
-            borderRadius: '8px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#45a049';
-            e.currentTarget.style.transform = 'scale(1.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#4CAF50';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          Return to Lobby
-        </button>
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <button
+            onClick={onRematch}
+            style={{
+              flex: 1,
+              padding: '15px',
+              background: '#4CAF50',
+              color: '#fff',
+              border: '2px solid #8B4513',
+              borderRadius: '8px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#45a049';
+              e.currentTarget.style.transform = 'scale(1.02)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#4CAF50';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            🔄 Rematch
+          </button>
+          <button
+            onClick={onReturnToLobby}
+            style={{
+              flex: 1,
+              padding: '15px',
+              background: '#dc3545',
+              color: '#fff',
+              border: '2px solid #8B4513',
+              borderRadius: '8px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#c82333';
+              e.currentTarget.style.transform = 'scale(1.02)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#dc3545';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            Return to Lobby
+          </button>
+        </div>
       </div>
     </div>
   );

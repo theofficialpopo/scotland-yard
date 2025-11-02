@@ -739,13 +739,19 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Assign roles: first player is Mr. X, others are detectives
-    room.players[0].role = 'mrX';
-    room.players[0].detectiveIndex = null;
+    // Assign roles: randomly select one player as Mr. X, others are detectives
+    const mrXIndex = Math.floor(Math.random() * room.players.length);
 
-    for (let i = 1; i < room.players.length; i++) {
-      room.players[i].role = 'detective';
-      room.players[i].detectiveIndex = i - 1; // Track detective index for game state
+    let detectiveIndex = 0;
+    for (let i = 0; i < room.players.length; i++) {
+      if (i === mrXIndex) {
+        room.players[i].role = 'mrX';
+        room.players[i].detectiveIndex = null;
+      } else {
+        room.players[i].role = 'detective';
+        room.players[i].detectiveIndex = detectiveIndex;
+        detectiveIndex++;
+      }
     }
 
     room.status = 'PLAYING';
@@ -787,6 +793,90 @@ io.on('connection', (socket) => {
     });
 
     console.log(`Game started in room ${roomCode} with ${room.players.length} players`);
+    console.log(`Starting positions: Mr. X at ${room.gameState.mrX.position}, Detectives at ${room.gameState.detectives.map(d => d.position).join(', ')}`);
+  }));
+
+  // Handle game rematch
+  socket.on('game:rematch', safeHandler(({ roomCode }) => {
+    if (!validateRoomCode(roomCode)) {
+      socket.emit('error', { message: 'Invalid room code', code: 'INVALID_ROOM_CODE' });
+      return;
+    }
+
+    const room = activeGames.get(roomCode.toUpperCase());
+
+    if (!room) {
+      socket.emit('error', { message: 'Room not found', code: 'ROOM_NOT_FOUND' });
+      return;
+    }
+
+    if (!room.gameState || !room.gameState.winner) {
+      socket.emit('error', { message: 'Game must be finished before rematch', code: 'GAME_NOT_FINISHED' });
+      return;
+    }
+
+    if (room.players.length < 2) {
+      socket.emit('error', { message: 'Need at least 2 players for rematch', code: 'NOT_ENOUGH_PLAYERS' });
+      return;
+    }
+
+    console.log(`Starting rematch in room ${roomCode}`);
+
+    // Assign new random roles for the rematch
+    const mrXIndex = Math.floor(Math.random() * room.players.length);
+
+    let detectiveIndex = 0;
+    for (let i = 0; i < room.players.length; i++) {
+      if (i === mrXIndex) {
+        room.players[i].role = 'mrX';
+        room.players[i].detectiveIndex = null;
+      } else {
+        room.players[i].role = 'detective';
+        room.players[i].detectiveIndex = detectiveIndex;
+        detectiveIndex++;
+      }
+    }
+
+    room.status = 'PLAYING';
+    room.startedAt = Date.now();
+    room.lastActivity = Date.now();
+
+    // Initialize fresh game state
+    room.gameState = {
+      currentRound: 1,
+      maxRounds: 24,
+      revealRounds: [3, 8, 13, 18, 24],
+      currentPlayerIndex: 0, // Start with Mr. X
+      doubleMoveInProgress: false,
+      mrX: {
+        position: null, // Will be set by assignStartingPositions
+        tickets: { taxi: 4, bus: 3, underground: 3, black: room.players.length - 1 },
+        doubleMoves: 2,
+        moveHistory: []
+      },
+      detectives: room.players.slice(1).map(() => ({
+        position: null, // Will be set by assignStartingPositions
+        tickets: { taxi: 10, bus: 8, underground: 4 }
+      })),
+      winner: null,
+      winReason: null,
+      moveHistory: []
+    };
+
+    // Assign starting positions
+    assignStartingPositions(room);
+
+    // Send filtered game state to each player
+    room.players.forEach(player => {
+      const filteredRoom = getFilteredRoomForPlayer(room, player.id);
+      io.to(player.id).emit('game:started', {
+        room: filteredRoom,
+        message: 'Rematch started! New roles assigned and positions set.'
+      });
+    });
+
+    console.log(`Rematch started in room ${roomCode} with ${room.players.length} players`);
+    console.log(`New Mr. X: ${room.players[mrXIndex].name}`);
     console.log(`Starting positions: Mr. X at ${room.gameState.mrX.position}, Detectives at ${room.gameState.detectives.map(d => d.position).join(', ')}`);
   }));
 
