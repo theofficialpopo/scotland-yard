@@ -210,49 +210,106 @@ function App() {
       )}
 
       {gameState === 'playing' && room && (
-        <div>
-          <div className="card">
-            <h2>Game in Progress</h2>
-            <p><strong>Room:</strong> {roomCode}</p>
-            <p><strong>Round:</strong> {room.gameState?.currentRound || 1} / {room.gameState?.maxRounds || 24}</p>
-
-            <h3>Players</h3>
-            <ul>
-              {room.players.map((player) => (
-                <li key={player.id}>
-                  {player.name} - {player.role === 'mrX' ? '🎩 Mister X' : '🔍 Detective'}
-                  {player.id === playerId && ' (You)'}
-                </li>
-              ))}
-            </ul>
-
-            {room.gameState?.mrX && (
-              <div style={{ marginTop: '20px' }}>
-                <h4>Mr. X Tickets</h4>
-                <div>
-                  <span className="ticket ticket-taxi">Taxi: {room.gameState.mrX.tickets.taxi}</span>
-                  <span className="ticket ticket-bus">Bus: {room.gameState.mrX.tickets.bus}</span>
-                  <span className="ticket ticket-underground">Underground: {room.gameState.mrX.tickets.underground}</span>
-                  <span className="ticket ticket-black">Black: {room.gameState.mrX.tickets.black}</span>
-                </div>
-              </div>
-            )}
+        <div className="game-container">
+          {/* Top HUD Bar */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '60px',
+            background: 'rgba(20, 20, 20, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderBottom: '2px solid #8B4513',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 20px',
+            zIndex: 100,
+            color: '#f5f5f5'
+          }}>
+            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+              🎩 Scotland Yard
+            </div>
+            <div style={{ fontSize: '16px' }}>
+              Round: {room.gameState?.currentRound || 1} / {room.gameState?.maxRounds || 24}
+            </div>
+            <div>
+              <button
+                className="button"
+                onClick={handleLeaveRoom}
+                style={{ background: '#dc3545', padding: '8px 16px' }}
+              >
+                Leave Game
+              </button>
+            </div>
           </div>
 
-          <Board
-            room={room}
-            playerId={playerId}
-            socket={socket}
-            emit={emit}
-          />
+          {/* Main Game Area */}
+          <div className="game-main" style={{ marginTop: '60px' }}>
+            {/* Left Panel - Players & Info */}
+            <div style={{
+              width: '280px',
+              background: 'rgba(30, 25, 20, 0.95)',
+              borderRight: '3px solid #8B4513',
+              padding: '20px',
+              overflowY: 'auto',
+              color: '#f5f5f5'
+            }}>
+              <h3 style={{ marginTop: 0, borderBottom: '2px solid #8B4513', paddingBottom: '10px' }}>
+                Players
+              </h3>
 
-          <button
-            className="button"
-            onClick={handleLeaveRoom}
-            style={{ marginTop: '20px', background: '#dc3545' }}
-          >
-            Leave Game
-          </button>
+              {room.players.map((player) => (
+                <div
+                  key={player.id}
+                  style={{
+                    background: 'rgba(50, 45, 40, 0.6)',
+                    border: `2px solid ${player.id === playerId ? '#FFD700' : '#8B4513'}`,
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginBottom: '12px'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                    {player.role === 'mrX' ? '🎩' : '🔍'} {player.name}
+                    {player.id === playerId && ' (You)'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#ccc' }}>
+                    {player.role === 'mrX' ? 'Mister X' : 'Detective'}
+                  </div>
+
+                  {player.role === 'mrX' && room.gameState?.mrX && (
+                    <div style={{ marginTop: '10px', fontSize: '13px' }}>
+                      <div>🚕 Taxi: {room.gameState.mrX.tickets.taxi}</div>
+                      <div>🚌 Bus: {room.gameState.mrX.tickets.bus}</div>
+                      <div>🚇 Underground: {room.gameState.mrX.tickets.underground}</div>
+                      <div>⚫ Black: {room.gameState.mrX.tickets.black}</div>
+                      <div>🎴 Double: {room.gameState.mrX.doubleMoves}</div>
+                    </div>
+                  )}
+
+                  {player.role === 'detective' && player.detectiveIndex !== null && room.gameState?.detectives[player.detectiveIndex] && (
+                    <div style={{ marginTop: '10px', fontSize: '13px' }}>
+                      <div>🚕 Taxi: {room.gameState.detectives[player.detectiveIndex].tickets.taxi}</div>
+                      <div>🚌 Bus: {room.gameState.detectives[player.detectiveIndex].tickets.bus}</div>
+                      <div>🚇 Underground: {room.gameState.detectives[player.detectiveIndex].tickets.underground}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Center Board Area */}
+            <div className="board-area">
+              <Board
+                room={room}
+                playerId={playerId}
+                socket={socket}
+                emit={emit}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

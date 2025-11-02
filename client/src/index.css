@@ -10,13 +10,53 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
+
+  /* Fullscreen dark game background */
+  background: linear-gradient(135deg, #1a1410 0%, #2d2419 50%, #1a1410 100%);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Vignette effect */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 #root {
   min-height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 3;
 }
 
 .container {
@@ -80,11 +120,40 @@ body {
   margin: 10px 0;
 }
 
-.board-container {
-  background: white;
-  border-radius: 8px;
+/* Fullscreen Game Container */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Game Layout - Main Content */
+.game-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Center Board Area */
+.board-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  overflow: auto;
+}
+
+.board-container {
+  /* Board keeps parchment background */
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  max-width: 1200px;
+  width: 100%;
 }
 
 .station {
