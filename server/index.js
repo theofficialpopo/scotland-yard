@@ -129,7 +129,46 @@ let totalConnections = 0;
 const activeGames = new Map();
 const activePlayers = new Map();
 
-// Player reconnection tokens (playerId -> {token, roomCode, expiresAt})
+// Session Management System
+// Player sessions (sessionToken -> {playerId, roomCode, playerName, createdAt, lastActivity, ipAddress})
+const playerSessions = new Map();
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_CLEANUP_INTERVAL = 60 * 60 * 1000; // Clean up expired sessions every hour
+
+// Generate secure session token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Validate and refresh session
+function validateSession(sessionToken) {
+  const session = playerSessions.get(sessionToken);
+  if (!session) return null;
+
+  // Check if session expired
+  const now = Date.now();
+  if (now - session.lastActivity > SESSION_TIMEOUT) {
+    playerSessions.delete(sessionToken);
+    return null;
+  }
+
+  // Refresh last activity (sliding window)
+  session.lastActivity = now;
+  return session;
+}
+
+// Clean up expired sessions periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of playerSessions.entries()) {
+    if (now - session.lastActivity > SESSION_TIMEOUT) {
+      playerSessions.delete(token);
+      console.log(`🧹 Cleaned up expired session for player: ${session.playerName}`);
+    }
+  }
+}, SESSION_CLEANUP_INTERVAL);
+
+// Legacy reconnection tokens (keeping for backward compatibility)
 const reconnectionTokens = new Map();
 const RECONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const STALE_CONNECTION_THRESHOLD = RECONNECTION_TIMEOUT; // Same as reconnection timeout
@@ -577,6 +616,111 @@ io.on('connection', (socket) => {
     console.log(`[Reconnection] Player ${room.players[playerIndex].name} (${oldSocketId} -> ${socket.id}) reconnected to room ${roomCode}`);
   }));
 
+  // Handle session validation and auto-rejoin
+  socket.on('session:validate', safeHandler(({ sessionToken }) => {
+    // Input validation
+    if (!sessionToken || typeof sessionToken !== 'string' || sessionToken.length !== 64) {
+      socket.emit('error', {
+        message: 'Invalid session token format.',
+        code: 'INVALID_INPUT'
+      });
+      return;
+    }
+
+    // Rate limiting
+    if (!checkRateLimit(socket.id, 'session:validate', 5, 10000)) {
+      socket.emit('error', {
+        message: 'Too many session validation attempts',
+        code: 'RATE_LIMIT'
+      });
+      return;
+    }
+
+    // Validate the session
+    const session = validateSession(sessionToken);
+
+    if (!session) {
+      socket.emit('session:invalid', {
+        message: 'Session expired or invalid. Please rejoin the game.'
+      });
+      return;
+    }
+
+    // Check if the room still exists
+    const room = activeGames.get(session.roomCode);
+
+    if (!room) {
+      // Room no longer exists, delete the session
+      playerSessions.delete(sessionToken);
+      socket.emit('session:invalid', {
+        message: 'Game room no longer exists.'
+      });
+      return;
+    }
+
+    // Find the player in the room
+    const playerIndex = room.players.findIndex(p => p.name === session.playerName);
+
+    if (playerIndex === -1) {
+      // Player not in room anymore
+      playerSessions.delete(sessionToken);
+      socket.emit('session:invalid', {
+        message: 'You are no longer in this game.'
+      });
+      return;
+    }
+
+    // Optional: Verify IP address matches (helps prevent token theft)
+    const currentIp = socket.handshake.address || 'unknown';
+    if (session.ipAddress !== currentIp) {
+      console.log(`[Session Warning] IP mismatch for ${session.playerName}: ${session.ipAddress} -> ${currentIp}`);
+      // Note: We don't reject here because users can have dynamic IPs (mobile, WiFi switching, etc.)
+      // This is just logged for security monitoring
+    }
+
+    // Update player's socket ID and mark as connected
+    const oldSocketId = room.players[playerIndex].id;
+
+    // Disconnect old socket if still connected (prevents duplicate connections)
+    const oldSocket = io.sockets.sockets.get(oldSocketId);
+    if (oldSocket && oldSocketId !== socket.id) {
+      oldSocket.disconnect(true);
+      console.log(`[Session Rejoin] Disconnected old socket ${oldSocketId}`);
+    }
+
+    // Update player connection
+    room.players[playerIndex].id = socket.id;
+    room.players[playerIndex].connected = true;
+
+    // Update active players mapping
+    activePlayers.delete(oldSocketId);
+    activePlayers.set(socket.id, {
+      id: socket.id,
+      name: session.playerName,
+      connectedAt: Date.now()
+    });
+
+    // Join the socket room
+    socket.join(session.roomCode);
+
+    // Send success response with room state
+    socket.emit('session:validated', {
+      roomCode: session.roomCode,
+      playerId: socket.id,
+      playerName: session.playerName,
+      room: getFilteredRoomForPlayer(room, socket.id),
+      message: 'Successfully rejoined your game!'
+    });
+
+    // Notify other players
+    io.to(session.roomCode).emit('player:reconnected:broadcast', {
+      playerId: socket.id,
+      playerName: session.playerName
+    });
+
+    console.log(`[Session Rejoin] ${session.playerName} rejoined room ${session.roomCode} via session token`);
+  }));
+
   // Handle room creation
   socket.on('room:create', safeHandler(({ playerName }) => {
     // Validate input
@@ -627,9 +771,23 @@ io.on('connection', (socket) => {
     activeGames.set(roomCode, room);
     socket.join(roomCode);
 
+    // Generate session token for the player
+    const sessionToken = generateSessionToken();
+    const ipAddress = socket.handshake.address || 'unknown';
+
+    playerSessions.set(sessionToken, {
+      playerId: socket.id,
+      roomCode,
+      playerName: sanitizedName,
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      ipAddress
+    });
+
     socket.emit('room:created', {
       roomCode,
-      room
+      room,
+      sessionToken // Send token to client for localStorage storage
     });
 
     console.log(`Room ${roomCode} created by ${sanitizedName}`);
@@ -708,6 +866,22 @@ io.on('connection', (socket) => {
 
     room.lastActivity = Date.now();
     socket.join(roomCode);
+
+    // Generate session token for the player
+    const sessionToken = generateSessionToken();
+    const ipAddress = socket.handshake.address || 'unknown';
+
+    playerSessions.set(sessionToken, {
+      playerId: socket.id,
+      roomCode: roomCode.toUpperCase(),
+      playerName: sanitizedName,
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
+      ipAddress
+    });
+
+    // Send session token to the player who joined
+    socket.emit('session:token', { sessionToken });
 
     // Notify all players in room
     io.to(roomCode).emit('room:updated', room);

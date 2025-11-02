@@ -18,6 +18,70 @@ function App() {
   // Track all unsubscribe functions to prevent memory leaks
   const cleanupFunctions = useRef([]);
 
+  // Helper function to save session data to localStorage
+  const saveSessionData = (sessionToken, roomCode) => {
+    try {
+      localStorage.setItem('scotland-yard-session', JSON.stringify({
+        sessionToken,
+        roomCode,
+        savedAt: Date.now()
+      }));
+      console.log('Session saved to localStorage:', { roomCode });
+    } catch (err) {
+      console.error('Failed to save session to localStorage:', err);
+    }
+  };
+
+  // Update URL when room code changes
+  useEffect(() => {
+    if (roomCode) {
+      // Add room code to URL for easy sharing and rejoining
+      const newUrl = `${window.location.pathname}?room=${roomCode}`;
+      window.history.pushState({ roomCode }, '', newUrl);
+      console.log('URL updated with room code:', roomCode);
+    } else {
+      // Clear URL when leaving room
+      window.history.pushState({}, '', window.location.pathname);
+    }
+  }, [roomCode]);
+
+  // Auto-rejoin logic on app startup
+  useEffect(() => {
+    if (!socket || !connected) return;
+
+    // Attempt auto-rejoin only once per connection
+    const attemptAutoRejoin = () => {
+      try {
+        // Check localStorage for saved session
+        const savedSession = localStorage.getItem('scotland-yard-session');
+
+        if (savedSession) {
+          const { sessionToken, roomCode: savedRoomCode } = JSON.parse(savedSession);
+
+          if (sessionToken && savedRoomCode) {
+            console.log('Attempting to rejoin room:', savedRoomCode);
+            emit('session:validate', { sessionToken });
+            setGameState('waiting'); // Show loading state while validating
+          }
+        } else {
+          // Check URL for room code (for shared links)
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlRoomCode = urlParams.get('room');
+
+          if (urlRoomCode) {
+            console.log('Room code found in URL but no saved session');
+            // User has a room code in URL but no session - they need to join manually
+          }
+        }
+      } catch (err) {
+        console.error('Error during auto-rejoin:', err);
+      }
+    };
+
+    // Run auto-rejoin once after socket connects
+    attemptAutoRejoin();
+  }, [socket, connected, emit]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -25,12 +89,17 @@ function App() {
     cleanupFunctions.current = [];
 
     // Listen for room created
-    const unsubRoomCreated = on('room:created', ({ roomCode, room }) => {
+    const unsubRoomCreated = on('room:created', ({ roomCode, room, sessionToken }) => {
       console.log('Room created:', roomCode);
       setRoomCode(roomCode);
       setRoom(room);
       setGameState('waiting');
       setError(null);
+
+      // Save session token to localStorage
+      if (sessionToken) {
+        saveSessionData(sessionToken, roomCode);
+      }
     });
     cleanupFunctions.current.push(unsubRoomCreated);
 
@@ -73,6 +142,52 @@ function App() {
       // Room state will be updated via game:state:updated
     });
     cleanupFunctions.current.push(unsubGameOver);
+
+    // Listen for session token (when joining existing room)
+    const unsubSessionToken = on('session:token', ({ sessionToken }) => {
+      console.log('Session token received');
+      if (sessionToken && roomCode) {
+        saveSessionData(sessionToken, roomCode);
+      }
+    });
+    cleanupFunctions.current.push(unsubSessionToken);
+
+    // Listen for session validation success (auto-rejoin)
+    const unsubSessionValidated = on('session:validated', ({ roomCode, playerId, playerName, room, message }) => {
+      console.log('Session validated successfully:', message);
+      setPlayerId(playerId);
+      setPlayerName(playerName);
+      setRoomCode(roomCode);
+      setRoom(room);
+
+      // Determine game state based on room status
+      if (room.status === 'PLAYING') {
+        setGameState('playing');
+      } else {
+        setGameState('waiting');
+      }
+
+      setError(null);
+    });
+    cleanupFunctions.current.push(unsubSessionValidated);
+
+    // Listen for session validation failure
+    const unsubSessionInvalid = on('session:invalid', ({ message }) => {
+      console.log('Session invalid:', message);
+      setGameState('lobby');
+      setError(message);
+
+      // Clear invalid session from localStorage
+      try {
+        localStorage.removeItem('scotland-yard-session');
+      } catch (err) {
+        console.error('Failed to clear invalid session:', err);
+      }
+
+      // Auto-clear error after timeout
+      setTimeout(() => setError(null), 5000);
+    });
+    cleanupFunctions.current.push(unsubSessionInvalid);
 
     // Listen for errors
     const unsubError = on('error', ({ message, code }) => {
@@ -142,6 +257,14 @@ function App() {
     setError(null);
     setGameEndData(null);
     setSelectedMrX(null); // Reset role selection
+
+    // Clear session from localStorage
+    try {
+      localStorage.removeItem('scotland-yard-session');
+      console.log('Session cleared from localStorage');
+    } catch (err) {
+      console.error('Failed to clear session from localStorage:', err);
+    }
   };
 
   const handleRematch = () => {
