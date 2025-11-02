@@ -46,15 +46,71 @@ function Board({ room, playerId, emit }) {
 
   // Get reachable stations from current position
   const reachableStations = useMemo(() => {
-    if (!currentPosition || !isMyTurn) return new Set();
+    if (!currentPosition || !isMyTurn || !myPlayer) return new Set();
 
     const reachable = new Set();
+    const currentTickets = myPlayer.role === 'mrX'
+      ? room.gameState.mrX.tickets
+      : room.gameState.detectives[myPlayer.detectiveIndex]?.tickets;
+
+    if (!currentTickets) return new Set();
+
+    // Get all occupied positions (for collision detection)
+    const occupiedPositions = new Set();
+
+    // For detectives, mark all detective positions and Mr. X position as occupied
+    if (myPlayer.role === 'detective') {
+      // Add Mr. X position
+      if (room.gameState.mrX.position) {
+        occupiedPositions.add(room.gameState.mrX.position);
+      }
+
+      // Add other detectives' positions
+      room.gameState.detectives.forEach((detective, index) => {
+        if (index !== myPlayer.detectiveIndex && detective.position) {
+          occupiedPositions.add(detective.position);
+        }
+      });
+    } else if (myPlayer.role === 'mrX') {
+      // For Mr. X, mark detective positions as occupied
+      room.gameState.detectives.forEach(detective => {
+        if (detective.position) {
+          occupiedPositions.add(detective.position);
+        }
+      });
+    }
+
+    // Find all connected stations where player has valid tickets
     connections.forEach(conn => {
-      if (conn.from === currentPosition) reachable.add(conn.to);
-      if (conn.to === currentPosition) reachable.add(conn.from);
+      let targetStation = null;
+
+      if (conn.from === currentPosition) {
+        targetStation = conn.to;
+      } else if (conn.to === currentPosition) {
+        targetStation = conn.from;
+      }
+
+      if (targetStation === null || occupiedPositions.has(targetStation)) {
+        return; // Skip occupied or irrelevant stations
+      }
+
+      // Check if player has any valid ticket for this connection
+      const hasValidTicket = conn.types.some(ticketType => {
+        // Mr. X can use black tickets for any connection
+        if (myPlayer.role === 'mrX' && currentTickets.black > 0) {
+          return true;
+        }
+        // Check if player has this specific ticket type
+        return currentTickets[ticketType] > 0;
+      });
+
+      if (hasValidTicket) {
+        reachable.add(targetStation);
+      }
     });
+
     return reachable;
-  }, [currentPosition, isMyTurn]);
+  }, [currentPosition, isMyTurn, myPlayer, room.gameState]);
 
   const handleStationClick = (stationId) => {
     if (!isMyTurn) {
