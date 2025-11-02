@@ -2,7 +2,7 @@
  * Move validation logic for Scotland Yard
  */
 
-import { areStationsConnected, stations } from './map.js';
+import { areStationsConnected, stations, connections } from './map.js';
 import { TICKET_TYPES, FERRY_STATIONS } from './constants.js';
 
 /**
@@ -17,6 +17,15 @@ import { TICKET_TYPES, FERRY_STATIONS } from './constants.js';
  */
 export function validateMove(move, player, gameState) {
   const { from, to, ticketType } = move;
+
+  // SECURITY: Verify 'from' position matches player's actual position
+  const actualPosition = player.role === 'mrX'
+    ? gameState.mrX.position
+    : gameState.detectives[player.detectiveIndex]?.position;
+
+  if (from !== actualPosition) {
+    return { valid: false, error: 'Invalid starting position' };
+  }
 
   // Check if stations exist
   if (!stations[from]) {
@@ -102,16 +111,46 @@ export function canDetectivesMove(gameState) {
 
     if (!hasTickets) return false;
 
-    // Check if any adjacent station is unoccupied
-    const station = stations[detective.position];
-    if (!station) return false;
+    // Get all adjacent stations with their required ticket types
+    const adjacentStations = new Map(); // Map<stationId, Set<ticketTypes>>
 
-    return station.connections.some(connectedStation => {
-      // Check if Mr. X or any other detective is at this station
-      const isMrXThere = gameState.mrX.position === connectedStation;
-      const isDetectiveThere = gameState.detectives.some(d => d.position === connectedStation);
-      return !isMrXThere && !isDetectiveThere;
-    });
+    for (const conn of connections) {
+      if (conn.from === detective.position) {
+        if (!adjacentStations.has(conn.to)) {
+          adjacentStations.set(conn.to, new Set());
+        }
+        conn.types.forEach(type => adjacentStations.get(conn.to).add(type));
+      }
+      // Connections are bidirectional
+      if (conn.to === detective.position) {
+        if (!adjacentStations.has(conn.from)) {
+          adjacentStations.set(conn.from, new Set());
+        }
+        conn.types.forEach(type => adjacentStations.get(conn.from).add(type));
+      }
+    }
+
+    // Check if any adjacent station is reachable and unoccupied
+    for (const [stationId, requiredTicketTypes] of adjacentStations) {
+      // Check if station is occupied
+      const isMrXThere = gameState.mrX.position === stationId;
+      const isDetectiveThere = gameState.detectives.some(d => d.position === stationId);
+
+      if (isMrXThere || isDetectiveThere) continue;
+
+      // Check if detective has at least one ticket type that can reach this station
+      const canReach = Array.from(requiredTicketTypes).some(ticketType => {
+        // Detectives can't use black or ferry tickets
+        if (ticketType === TICKET_TYPES.BLACK || ticketType === TICKET_TYPES.FERRY) {
+          return false;
+        }
+        return detective.tickets[ticketType] > 0;
+      });
+
+      if (canReach) return true;
+    }
+
+    return false;
   });
 }
 

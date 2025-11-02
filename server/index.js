@@ -486,7 +486,7 @@ io.on('connection', (socket) => {
   }));
 
   // Handle player move
-  socket.on('game:move', safeHandler(({ roomCode, from, to, ticketType, useDoubleMove = false }) => {
+  socket.on('game:move', safeHandler(({ roomCode, to, ticketType, useDoubleMove = false }) => {
     if (!validateRoomCode(roomCode)) {
       socket.emit('error', { message: 'Invalid room code', code: 'INVALID_ROOM_CODE' });
       return;
@@ -503,6 +503,16 @@ io.on('connection', (socket) => {
     const currentPlayer = room.players[room.gameState.currentPlayerIndex];
     if (currentPlayer.id !== socket.id) {
       socket.emit('error', { message: 'Not your turn', code: 'NOT_YOUR_TURN' });
+      return;
+    }
+
+    // SECURITY: Determine 'from' position server-side - NEVER trust client
+    const from = currentPlayer.role === 'mrX'
+      ? room.gameState.mrX.position
+      : room.gameState.detectives[currentPlayer.detectiveIndex]?.position;
+
+    if (!from) {
+      socket.emit('error', { message: 'Current position not found', code: 'POSITION_ERROR' });
       return;
     }
 
@@ -579,7 +589,8 @@ io.on('connection', (socket) => {
     room.lastActivity = Date.now();
 
     // If all players have moved, start new round
-    if (room.gameState.currentPlayerIndex >= room.players.length) {
+    // IMPORTANT: Don't advance round if double-move is in progress
+    if (room.gameState.currentPlayerIndex >= room.players.length && !room.gameState.doubleMoveInProgress) {
       room.gameState.currentPlayerIndex = 0;
       room.gameState.currentRound++;
     }

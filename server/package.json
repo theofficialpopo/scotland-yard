@@ -4,6 +4,9 @@
   "description": "Backend server for Scotland Yard multiplayer game",
   "main": "index.js",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"

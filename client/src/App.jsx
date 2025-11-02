@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Lobby from './components/Lobby';
 import Board from './components/Board';
@@ -12,8 +12,14 @@ function App() {
   const [playerId, setPlayerId] = useState(null);
   const [error, setError] = useState(null);
 
+  // Track all unsubscribe functions to prevent memory leaks
+  const cleanupFunctions = useRef([]);
+
   useEffect(() => {
     if (!socket) return;
+
+    // Clear previous cleanup functions
+    cleanupFunctions.current = [];
 
     // Listen for room created
     const unsubRoomCreated = on('room:created', ({ roomCode, room }) => {
@@ -23,18 +29,21 @@ function App() {
       setGameState('waiting');
       setError(null);
     });
+    cleanupFunctions.current.push(unsubRoomCreated);
 
     // Listen for room joined
     const unsubLobbyJoined = on('lobby:joined', ({ playerId, playerName }) => {
       console.log('Joined lobby:', playerId, playerName);
       setPlayerId(playerId);
     });
+    cleanupFunctions.current.push(unsubLobbyJoined);
 
     // Listen for room updates
     const unsubRoomUpdated = on('room:updated', (updatedRoom) => {
       console.log('Room updated:', updatedRoom);
       setRoom(updatedRoom);
     });
+    cleanupFunctions.current.push(unsubRoomUpdated);
 
     // Listen for game start
     const unsubGameStarted = on('game:started', ({ room, message }) => {
@@ -43,6 +52,7 @@ function App() {
       setGameState('playing');
       setError(null);
     });
+    cleanupFunctions.current.push(unsubGameStarted);
 
     // Listen for game state updates (after moves)
     const unsubGameStateUpdated = on('game:state:updated', ({ room, lastMove }) => {
@@ -50,6 +60,7 @@ function App() {
       setRoom(room);
       setError(null); // Clear any previous errors on successful move
     });
+    cleanupFunctions.current.push(unsubGameStateUpdated);
 
     // Listen for game over
     const unsubGameOver = on('game:over', ({ winner, reason }) => {
@@ -57,6 +68,7 @@ function App() {
       alert(`Game Over! ${winner === 'detectives' ? 'Detectives' : 'Mister X'} won! ${reason}`);
       // Room state will be updated via game:state:updated
     });
+    cleanupFunctions.current.push(unsubGameOver);
 
     // Listen for errors
     const unsubError = on('error', ({ message, code }) => {
@@ -66,15 +78,12 @@ function App() {
       const timeout = Math.min(Math.max(message.length * 100, 3000), 10000);
       setTimeout(() => setError(null), timeout);
     });
+    cleanupFunctions.current.push(unsubError);
 
     return () => {
-      unsubRoomCreated && unsubRoomCreated();
-      unsubLobbyJoined && unsubLobbyJoined();
-      unsubRoomUpdated && unsubRoomUpdated();
-      unsubGameStarted && unsubGameStarted();
-      unsubGameStateUpdated && unsubGameStateUpdated();
-      unsubGameOver && unsubGameOver();
-      unsubError && unsubError();
+      // Clean up all event listeners to prevent memory leaks
+      cleanupFunctions.current.forEach(cleanup => cleanup && cleanup());
+      cleanupFunctions.current = [];
     };
   }, [socket, on]);
 
@@ -84,8 +93,15 @@ function App() {
     let unsubOnce;
     unsubOnce = on('lobby:joined', () => {
       emit('room:create', { playerName: name });
-      if (unsubOnce) unsubOnce();
+      if (unsubOnce) {
+        unsubOnce();
+        // Remove from cleanup functions after it fires
+        const index = cleanupFunctions.current.indexOf(unsubOnce);
+        if (index > -1) cleanupFunctions.current.splice(index, 1);
+      }
     });
+    // Add to cleanup functions in case component unmounts before event fires
+    cleanupFunctions.current.push(unsubOnce);
     emit('join:lobby', { playerName: name });
   };
 
@@ -96,8 +112,15 @@ function App() {
     let unsubOnce;
     unsubOnce = on('lobby:joined', () => {
       emit('room:join', { roomCode: code, playerName: name });
-      if (unsubOnce) unsubOnce();
+      if (unsubOnce) {
+        unsubOnce();
+        // Remove from cleanup functions after it fires
+        const index = cleanupFunctions.current.indexOf(unsubOnce);
+        if (index > -1) cleanupFunctions.current.splice(index, 1);
+      }
     });
+    // Add to cleanup functions in case component unmounts before event fires
+    cleanupFunctions.current.push(unsubOnce);
     emit('join:lobby', { playerName: name });
     setGameState('waiting');
   };

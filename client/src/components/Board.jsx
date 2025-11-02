@@ -95,9 +95,9 @@ function Board({ room, playerId, emit }) {
       }
     }
 
+    // Note: 'from' is determined server-side for security (prevents cheating)
     emit('game:move', {
       roomCode: room.code,
-      from: currentPosition,
       to: selectedStation,
       ticketType,
       useDoubleMove: useDoubleMove
