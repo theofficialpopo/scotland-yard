@@ -55,6 +55,11 @@ const io = new Server(server, {
       // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
 
+      // In production, allow same-origin (frontend served by backend)
+      if (process.env.NODE_ENV === 'production') {
+        return callback(null, true);
+      }
+
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
