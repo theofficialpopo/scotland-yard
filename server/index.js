@@ -2,6 +2,8 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { validateMove, checkWinCondition } from './game/validation.js';
@@ -9,8 +11,32 @@ import { STARTING_STATIONS } from './game/constants.js';
 
 dotenv.config();
 
+// Validate required environment variables at startup
+const requiredEnvVars = ['PORT', 'CORS_ORIGIN'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ ERROR: Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('Please set these variables in your .env file or environment.');
+  console.error('Example:');
+  missingEnvVars.forEach(varName => {
+    if (varName === 'PORT') {
+      console.error(`  ${varName}=3001`);
+    } else if (varName === 'CORS_ORIGIN') {
+      console.error(`  ${varName}=http://localhost:5173`);
+    }
+  });
+  process.exit(1);
+}
+
 const app = express();
 const server = createServer(app);
+
+// Trust proxy - important for rate limiting behind reverse proxies (Railway, Vercel, etc.)
+app.set('trust proxy', 1);
+
+// Disable X-Powered-By header for security
+app.disable('x-powered-by');
 
 // CORS whitelist for production safety
 const allowedOrigins = process.env.CORS_ORIGIN
@@ -37,14 +63,44 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e6 // 1MB limit to prevent large payload attacks
 });
 
-// Middleware
+// Security middleware - Helmet.js for security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", ...allowedOrigins],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Vite dev
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      fontSrc: ["'self'", "data:"]
+    }
+  },
+  crossOriginEmbedderPolicy: false // Allow WebSocket connections
+}));
+
+// CORS middleware
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-app.use(express.json());
 
-// Rate limiting map (simple in-memory, would use Redis in production)
+// Request size limits and JSON parsing
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ limit: '10kb', extended: true }));
+
+// HTTP rate limiting for Express endpoints
+const httpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiting to all routes
+app.use(httpLimiter);
+
+// Rate limiting map for Socket.IO (simple in-memory, would use Redis in production)
 const rateLimits = new Map();
 
 // Health check endpoint
