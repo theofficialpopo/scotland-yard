@@ -5,6 +5,7 @@ function AdminPanel({ socket, connected }) {
   const [stats, setStats] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   // Fetch room data from server
   useEffect(() => {
@@ -22,10 +23,17 @@ function AdminPanel({ socket, connected }) {
 
     const handleAdminError = ({ message }) => {
       setError(message);
+      setTimeout(() => setError(null), 5000);
+    };
+
+    const handleAdminSuccess = ({ message }) => {
+      setSuccessMessage(message);
+      setTimeout(() => setSuccessMessage(null), 3000);
     };
 
     socket.on('admin:data', handleAdminData);
     socket.on('admin:error', handleAdminError);
+    socket.on('admin:action-success', handleAdminSuccess);
 
     // Poll for updates every 2 seconds
     const interval = setInterval(() => {
@@ -35,9 +43,23 @@ function AdminPanel({ socket, connected }) {
     return () => {
       socket.off('admin:data', handleAdminData);
       socket.off('admin:error', handleAdminError);
+      socket.off('admin:action-success', handleAdminSuccess);
       clearInterval(interval);
     };
   }, [socket, connected]);
+
+  const handleKickPlayer = (roomCode, playerName) => {
+    if (confirm(`Are you sure you want to kick ${playerName} from room ${roomCode}?`)) {
+      socket.emit('admin:kick-player', { roomCode, playerName });
+    }
+  };
+
+  const handleCloseRoom = (roomCode) => {
+    if (confirm(`Are you sure you want to close room ${roomCode}? All players will be disconnected.`)) {
+      socket.emit('admin:close-room', { roomCode });
+      setSelectedRoom(null);
+    }
+  };
 
   if (error) {
     return (
@@ -96,6 +118,23 @@ function AdminPanel({ socket, connected }) {
         </div>
       )}
 
+      {/* Success Message */}
+      {successMessage && (
+        <div style={{
+          background: 'rgba(76, 175, 80, 0.9)',
+          border: '2px solid #4CAF50',
+          borderRadius: '8px',
+          padding: '15px',
+          marginBottom: '20px',
+          color: '#fff',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          textAlign: 'center'
+        }}>
+          ✓ {successMessage}
+        </div>
+      )}
+
       {/* Room List */}
       <div style={{
         background: 'rgba(50, 45, 40, 0.8)',
@@ -124,6 +163,8 @@ function AdminPanel({ socket, connected }) {
                 room={room}
                 selected={selectedRoom === room.code}
                 onClick={() => setSelectedRoom(selectedRoom === room.code ? null : room.code)}
+                onKickPlayer={handleKickPlayer}
+                onCloseRoom={handleCloseRoom}
               />
             ))}
           </div>
@@ -162,7 +203,7 @@ function StatCard({ title, value, color }) {
   );
 }
 
-function RoomCard({ room, selected, onClick }) {
+function RoomCard({ room, selected, onClick, onKickPlayer, onCloseRoom }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'PLAYING': return '#4CAF50';
@@ -185,22 +226,24 @@ function RoomCard({ room, selected, onClick }) {
 
   return (
     <div
-      onClick={onClick}
       style={{
         background: selected ? 'rgba(70, 60, 50, 0.9)' : 'rgba(60, 55, 50, 0.6)',
         border: `2px solid ${selected ? '#FFD700' : '#8B4513'}`,
         borderRadius: '8px',
         padding: '15px',
-        cursor: 'pointer',
         transition: 'all 0.2s'
       }}
     >
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '120px 1fr 100px 100px 150px',
-        gap: '15px',
-        alignItems: 'center'
-      }}>
+      <div
+        onClick={onClick}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '120px 1fr 100px 100px 150px 120px',
+          gap: '15px',
+          alignItems: 'center',
+          cursor: 'pointer'
+        }}
+      >
         {/* Room Code */}
         <div>
           <div style={{ fontSize: '12px', color: '#999', marginBottom: '5px' }}>
@@ -260,6 +303,36 @@ function RoomCard({ room, selected, onClick }) {
             {getTimeElapsed(room.createdAt)}
           </div>
         </div>
+
+        {/* Close Room Button */}
+        <div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCloseRoom(room.code);
+            }}
+            style={{
+              padding: '8px 12px',
+              background: '#dc3545',
+              color: '#fff',
+              border: '2px solid #8B4513',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              width: '100%'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#c82333';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#dc3545';
+            }}
+          >
+            Close Room
+          </button>
+        </div>
       </div>
 
       {/* Expanded Details */}
@@ -296,11 +369,38 @@ function RoomCard({ room, selected, onClick }) {
                     </span>
                   )}
                 </div>
-                <div style={{
-                  fontSize: '12px',
-                  color: player.connected ? '#4CAF50' : '#dc3545'
-                }}>
-                  {player.connected ? '● Online' : '○ Offline'}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: player.connected ? '#4CAF50' : '#dc3545'
+                  }}>
+                    {player.connected ? '● Online' : '○ Offline'}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onKickPlayer(room.code, player.name);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      background: '#ff5722',
+                      color: '#fff',
+                      border: '1px solid #8B4513',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = '#e64a19';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = '#ff5722';
+                    }}
+                  >
+                    Kick
+                  </button>
                 </div>
               </div>
             ))}

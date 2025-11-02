@@ -1283,6 +1283,132 @@ io.on('connection', (socket) => {
     console.log(`[Admin] Data sent to client ${socket.id}`);
   }));
 
+  // Handle admin kick player
+  socket.on('admin:kick-player', safeHandler(({ roomCode, playerName }) => {
+    // Simple authentication check
+    const adminKey = process.env.ADMIN_KEY;
+    if (adminKey && adminKey !== '' && process.env.NODE_ENV !== 'development') {
+      socket.emit('admin:error', {
+        message: 'Admin access is protected. Authentication required.'
+      });
+      return;
+    }
+
+    // Validate input
+    if (!validateRoomCode(roomCode)) {
+      socket.emit('admin:error', { message: 'Invalid room code' });
+      return;
+    }
+
+    if (!playerName || typeof playerName !== 'string') {
+      socket.emit('admin:error', { message: 'Invalid player name' });
+      return;
+    }
+
+    const room = activeGames.get(roomCode.toUpperCase());
+    if (!room) {
+      socket.emit('admin:error', { message: 'Room not found' });
+      return;
+    }
+
+    // Find player by name
+    const playerIndex = room.players.findIndex(p => p.name === playerName);
+    if (playerIndex === -1) {
+      socket.emit('admin:error', { message: 'Player not found in room' });
+      return;
+    }
+
+    const player = room.players[playerIndex];
+    const playerId = player.id;
+
+    // Remove player from room
+    room.players.splice(playerIndex, 1);
+
+    // Remove from active players
+    activePlayers.delete(playerId);
+
+    // Disconnect the player's socket
+    const playerSocket = io.sockets.sockets.get(playerId);
+    if (playerSocket) {
+      playerSocket.emit('error', {
+        message: 'You have been removed from the game by an administrator.',
+        code: 'ADMIN_KICK'
+      });
+      playerSocket.disconnect(true);
+    }
+
+    // Notify remaining players
+    io.to(roomCode).emit('player:kicked', {
+      playerName,
+      message: `${playerName} was removed by an administrator`
+    });
+
+    // If room is now empty, delete it
+    if (room.players.length === 0) {
+      activeGames.delete(roomCode.toUpperCase());
+      console.log(`[Admin] Room ${roomCode} deleted (all players kicked)`);
+    } else {
+      // If the kicked player was the host, assign new host
+      if (room.host === playerId && room.players.length > 0) {
+        room.host = room.players[0].id;
+        io.to(roomCode).emit('room:updated', room);
+        console.log(`[Admin] New host assigned in room ${roomCode}: ${room.players[0].name}`);
+      }
+    }
+
+    socket.emit('admin:action-success', {
+      message: `Player ${playerName} kicked from room ${roomCode}`
+    });
+
+    console.log(`[Admin] Player ${playerName} kicked from room ${roomCode} by ${socket.id}`);
+  }));
+
+  // Handle admin close room
+  socket.on('admin:close-room', safeHandler(({ roomCode }) => {
+    // Simple authentication check
+    const adminKey = process.env.ADMIN_KEY;
+    if (adminKey && adminKey !== '' && process.env.NODE_ENV !== 'development') {
+      socket.emit('admin:error', {
+        message: 'Admin access is protected. Authentication required.'
+      });
+      return;
+    }
+
+    // Validate input
+    if (!validateRoomCode(roomCode)) {
+      socket.emit('admin:error', { message: 'Invalid room code' });
+      return;
+    }
+
+    const room = activeGames.get(roomCode.toUpperCase());
+    if (!room) {
+      socket.emit('admin:error', { message: 'Room not found' });
+      return;
+    }
+
+    // Disconnect all players in the room
+    room.players.forEach(player => {
+      const playerSocket = io.sockets.sockets.get(player.id);
+      if (playerSocket) {
+        playerSocket.emit('error', {
+          message: 'This game has been closed by an administrator.',
+          code: 'ADMIN_CLOSE'
+        });
+        playerSocket.disconnect(true);
+      }
+      activePlayers.delete(player.id);
+    });
+
+    // Delete the room
+    activeGames.delete(roomCode.toUpperCase());
+
+    socket.emit('admin:action-success', {
+      message: `Room ${roomCode} closed successfully`
+    });
+
+    console.log(`[Admin] Room ${roomCode} closed by ${socket.id}`);
+  }));
+
   // Handle disconnection
   socket.on('disconnect', (reason) => {
     console.log(`[${new Date().toISOString()}] Client disconnected: ${socket.id} (${reason})`);
