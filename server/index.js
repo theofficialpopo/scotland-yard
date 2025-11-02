@@ -79,11 +79,25 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      connectSrc: ["'self'", ...allowedOrigins],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Vite dev
+      connectSrc: [
+        "'self'",
+        ...allowedOrigins,
+        "https://api.mapbox.com",
+        "https://*.tiles.mapbox.com",
+        "https://events.mapbox.com"
+      ],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // unsafe-eval needed for Mapbox workers
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      fontSrc: ["'self'", "data:"]
+      imgSrc: [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://api.mapbox.com",
+        "https://*.tiles.mapbox.com"
+      ],
+      fontSrc: ["'self'", "data:"],
+      workerSrc: ["'self'", "blob:"], // Allow Mapbox web workers
+      childSrc: ["'self'", "blob:"]   // Allow Mapbox blob URLs
     }
   },
   crossOriginEmbedderPolicy: false // Allow WebSocket connections
