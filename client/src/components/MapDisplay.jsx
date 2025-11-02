@@ -22,17 +22,17 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Get city configuration
-  const cityConfig = getCityConfig(cityId);
+  // Get city configuration (if using predefined city)
+  const cityConfig = cityId === 'generated' ? null : getCityConfig(cityId);
 
   // Get Mapbox token from environment
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
   // Initial viewport state
   const [viewState, setViewState] = useState({
-    longitude: cityConfig.center[0],
-    latitude: cityConfig.center[1],
-    zoom: cityConfig.zoom,
+    longitude: cityConfig ? cityConfig.center[0] : 0,
+    latitude: cityConfig ? cityConfig.center[1] : 0,
+    zoom: cityConfig ? cityConfig.zoom : 12,
     pitch: 0,    // Keep flat for game board
     bearing: 0   // North up
   });
@@ -178,10 +178,10 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
         onLoad={handleLoad}
         mapboxAccessToken={MAPBOX_TOKEN}
         style={{ width: '100%', height: '100%' }}
-        mapStyle={cityConfig.style}
-        minZoom={cityConfig.minZoom}
-        maxZoom={cityConfig.maxZoom}
-        maxBounds={cityConfig.bounds}
+        mapStyle={cityConfig ? cityConfig.style : 'mapbox://styles/mapbox/streets-v12'}
+        minZoom={cityConfig ? cityConfig.minZoom : 11}
+        maxZoom={cityConfig ? cityConfig.maxZoom : 18}
+        maxBounds={cityConfig ? cityConfig.bounds : undefined}
         dragRotate={false}      // Disable rotation for game board
         touchZoomRotate={false} // Disable touch rotation
         doubleClickZoom={true}
@@ -193,34 +193,36 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
         {mapLoaded && children}
       </Map>
 
-      {/* City Name Badge */}
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        left: '20px',
-        background: 'rgba(30, 25, 20, 0.9)',
-        border: '2px solid #8B4513',
-        borderRadius: '8px',
-        padding: '12px 20px',
-        color: '#f5f5f5',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-        zIndex: 1
-      }}>
+      {/* City Name Badge (only for predefined cities) */}
+      {cityConfig && (
         <div style={{
-          fontSize: '18px',
-          fontWeight: 'bold',
-          color: '#FFD700',
-          marginBottom: '4px'
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          background: 'rgba(30, 25, 20, 0.9)',
+          border: '2px solid #8B4513',
+          borderRadius: '8px',
+          padding: '12px 20px',
+          color: '#f5f5f5',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          zIndex: 1
         }}>
-          {cityConfig.name}
+          <div style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#FFD700',
+            marginBottom: '4px'
+          }}>
+            {cityConfig.name}
+          </div>
+          <div style={{
+            fontSize: '12px',
+            color: '#ccc'
+          }}>
+            {cityConfig.description}
+          </div>
         </div>
-        <div style={{
-          fontSize: '12px',
-          color: '#ccc'
-        }}>
-          {cityConfig.description}
-        </div>
-      </div>
+      )}
 
       {/* Loading Indicator */}
       {!mapLoaded && (
@@ -251,7 +253,7 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
               fontSize: '18px',
               color: '#FFD700'
             }}>
-              Loading {cityConfig.name}...
+              Loading {cityConfig ? cityConfig.name : 'map'}...
             </div>
           </div>
         </div>
