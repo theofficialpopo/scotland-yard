@@ -186,17 +186,30 @@ function StationMarker({
         </circle>
       )}
 
-      {/* Subtle gray highlight ring for reachable stations */}
+      {/* Gray highlight ring for reachable stations */}
       {isReachable && !isSelected && (
-        <circle
-          cx={x}
-          cy={y}
-          r={mainRadius + 3}
-          fill="none"
-          stroke="#888"
-          strokeWidth="2"
-          opacity="0.4"
-        />
+        <>
+          {/* Outer glow ring */}
+          <circle
+            cx={x}
+            cy={y}
+            r={mainRadius + 5}
+            fill="none"
+            stroke="#666"
+            strokeWidth="3"
+            opacity="0.6"
+          />
+          {/* Inner ring */}
+          <circle
+            cx={x}
+            cy={y}
+            r={mainRadius + 3}
+            fill="none"
+            stroke="#999"
+            strokeWidth="2.5"
+            opacity="0.75"
+          />
+        </>
       )}
     </g>
   );
