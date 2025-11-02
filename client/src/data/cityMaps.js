@@ -27,7 +27,7 @@ export const CITY_CONFIGS = {
     maxZoom: 14,     // Prevent zooming in too close
 
     // Visual settings
-    style: 'mapbox://styles/mapbox/dark-v11',  // Dark theme for Scotland Yard feel
+    style: 'mapbox://styles/mapbox/navigation-night-v1',  // Dark with colorful roads for Scotland Yard feel
 
     // Game settings (future use)
     recommendedStations: 20,  // Suggested number of stations for this map size
@@ -50,7 +50,7 @@ export const CITY_CONFIGS = {
     minZoom: 11,
     maxZoom: 14,
 
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
 
     recommendedStations: 22,
     area: 'manhattan'
@@ -72,7 +72,7 @@ export const CITY_CONFIGS = {
     minZoom: 11,
     maxZoom: 14,
 
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
 
     recommendedStations: 20,
     area: 'central'
@@ -94,7 +94,7 @@ export const CITY_CONFIGS = {
     minZoom: 11,
     maxZoom: 14,
 
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
 
     recommendedStations: 18,
     area: 'mitte'
@@ -116,7 +116,7 @@ export const CITY_CONFIGS = {
     minZoom: 11,
     maxZoom: 14,
 
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
 
     recommendedStations: 24,
     area: 'central'
