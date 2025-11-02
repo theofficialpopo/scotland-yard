@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import Map, { NavigationControl, ScaleControl } from 'react-map-gl';
+import Map from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getCityConfig } from '../data/cityMaps';
 
@@ -9,9 +9,9 @@ import { getCityConfig } from '../data/cityMaps';
  * Features:
  * - Bounded viewport that stays within city limits
  * - Prevents zooming out too far or in too close
- * - Zoom-based POI visibility (restaurants, hotels appear only when zoomed in)
+ * - Clean map display with POIs permanently hidden
  * - Road filtering (minor roads hidden at lower zoom for cleaner game board)
- * - Navigation controls for user interaction
+ * - Minimal UI for focused gameplay
  *
  * Props:
  * - cityId: The city to display (e.g., 'london', 'newyork')
@@ -44,29 +44,22 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
     const map = mapRef.current?.getMap();
     if (!map) return;
 
-    // Configure zoom-based POI visibility
-    // POIs appear only when zoomed in for detailed investigation
-    const poiLayersWithMinZoom = [
-      { id: 'poi-label', minZoom: 15 },              // Shops, restaurants, etc. - only at close zoom
-      { id: 'airport-label', minZoom: 14 },          // Airports - medium zoom
-      { id: 'natural-label', minZoom: 15 },          // Parks, natural features
-      { id: 'waterway-label', minZoom: 15 },         // Rivers, streams
-      { id: 'place-neighborhood', minZoom: 14.5 },   // Neighborhood names
-      { id: 'settlement-subdivision-label', minZoom: 15 } // Subdivisions
+    // Hide all POI labels permanently for clean game board
+    const layersToHide = [
+      'poi-label',                      // Points of interest (hotels, restaurants, shops)
+      'transit-label',                  // Transit labels (we'll add our own custom stations)
+      'airport-label',                  // Airport labels
+      'natural-label',                  // Natural features
+      'waterway-label',                 // Rivers, streams
+      'place-neighborhood',             // Neighborhood names
+      'settlement-subdivision-label'    // Subdivision labels
     ];
 
-    poiLayersWithMinZoom.forEach(({ id, minZoom }) => {
-      const layer = map.getLayer(id);
-      if (layer) {
-        // Set the layer's minzoom property to control visibility
-        map.setLayerZoomRange(id, minZoom, 22);
+    layersToHide.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', 'none');
       }
     });
-
-    // Keep transit labels hidden - we'll add our own custom stations
-    if (map.getLayer('transit-label')) {
-      map.setLayoutProperty('transit-label', 'visibility', 'none');
-    }
 
     // Filter roads to show only major roads at lower zoom levels
     // This reduces visual clutter for game board view
@@ -196,25 +189,6 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
         dragPan={true}
         keyboard={true}
       >
-        {/* Navigation Controls */}
-        <NavigationControl
-          position="top-right"
-          showCompass={false}  // Hide compass since we don't rotate
-          visualizePitch={false}
-        />
-
-        {/* Scale Control */}
-        <ScaleControl
-          maxWidth={100}
-          unit="metric"
-          position="bottom-left"
-          style={{
-            background: 'rgba(30, 25, 20, 0.8)',
-            borderColor: '#8B4513',
-            color: '#f5f5f5'
-          }}
-        />
-
         {/* Render overlay children (stations, player markers, etc.) */}
         {mapLoaded && children}
       </Map>

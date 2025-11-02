@@ -22,8 +22,8 @@ export const CITY_CONFIGS = {
     ],
 
     // Zoom levels
-    zoom: 13.5,      // Default zoom
-    minZoom: 12.5,   // Allow some zoom out
+    zoom: 12.5,      // Default zoom (larger viewport)
+    minZoom: 11.5,   // Allow more zoom out
     maxZoom: 16,     // Allow closer zoom for detail
 
     // Visual settings
@@ -47,8 +47,8 @@ export const CITY_CONFIGS = {
       [-73.9971, 40.7195]   // Northeast
     ],
 
-    zoom: 13.5,
-    minZoom: 12.5,
+    zoom: 12.5,
+    minZoom: 11.5,
     maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
@@ -70,8 +70,8 @@ export const CITY_CONFIGS = {
       [2.3625, 48.8633]    // Northeast
     ],
 
-    zoom: 13.5,
-    minZoom: 12.5,
+    zoom: 12.5,
+    minZoom: 11.5,
     maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
@@ -93,8 +93,8 @@ export const CITY_CONFIGS = {
       [13.4161, 52.5267]   // Northeast
     ],
 
-    zoom: 13.5,
-    minZoom: 12.5,
+    zoom: 12.5,
+    minZoom: 11.5,
     maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
@@ -116,8 +116,8 @@ export const CITY_CONFIGS = {
       [139.7774, 35.6829]   // Northeast
     ],
 
-    zoom: 13.5,
-    minZoom: 12.5,
+    zoom: 12.5,
+    minZoom: 11.5,
     maxZoom: 16,
 
     style: 'mapbox://styles/mapbox/streets-v12',
