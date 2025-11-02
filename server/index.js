@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { timingSafeEqual } from 'crypto';
 import { validateMove, checkWinCondition } from './game/validation.js';
 import { STARTING_STATIONS } from './game/constants.js';
 
@@ -115,6 +116,7 @@ const activePlayers = new Map();
 // Player reconnection tokens (playerId -> {token, roomCode, expiresAt})
 const reconnectionTokens = new Map();
 const RECONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const STALE_CONNECTION_THRESHOLD = RECONNECTION_TIMEOUT; // Same as reconnection timeout
 
 // Enhanced health check endpoint with Socket.IO verification
 app.get('/health', (req, res) => {
@@ -122,13 +124,20 @@ app.get('/health', (req, res) => {
   const timeSinceLastConnection = now - lastSocketConnection;
   const detailedMode = req.query.detailed === 'true';
 
-  // Check for stale connections - if we have rooms but no connections in 5 minutes, something's wrong
+  // Check for stale connections - if we have rooms but no connections in threshold time, something's wrong
   const hasActiveRooms = activeGames.size > 0;
-  const staleConnections = hasActiveRooms && timeSinceLastConnection > 300000; // 5 minutes
+  const staleConnections = hasActiveRooms && timeSinceLastConnection > STALE_CONNECTION_THRESHOLD;
 
   // Determine overall health status
   const isHealthy = socketIOHealthy && !staleConnections;
   const status = isHealthy ? 'OK' : 'DEGRADED';
+
+  // Optimize room stats calculation - single iteration instead of multiple filter passes
+  const roomStats = { total: activeGames.size, inGame: 0, waiting: 0 };
+  for (const game of activeGames.values()) {
+    if (game.status === 'IN_PROGRESS') roomStats.inGame++;
+    else if (game.status === 'WAITING') roomStats.waiting++;
+  }
 
   const healthData = {
     status,
@@ -141,18 +150,26 @@ app.get('/health', (req, res) => {
       timeSinceLastConnection: Math.floor(timeSinceLastConnection / 1000) + 's',
       totalConnectionsLifetime: totalConnections
     },
-    rooms: {
-      total: activeGames.size,
-      inGame: Array.from(activeGames.values()).filter(g => g.status === 'IN_PROGRESS').length,
-      waiting: Array.from(activeGames.values()).filter(g => g.status === 'WAITING').length
-    },
+    rooms: roomStats,
     players: {
       total: activePlayers.size
     }
   };
 
-  // Add detailed information if requested
+  // Add detailed information if requested (with optional authentication)
   if (detailedMode) {
+    // If HEALTH_API_KEY is set, require it for detailed mode
+    const healthApiKey = process.env.HEALTH_API_KEY;
+    const providedKey = req.query.apiKey || req.headers['x-api-key'];
+
+    if (healthApiKey && providedKey !== healthApiKey) {
+      res.status(401).json({
+        status: 'ERROR',
+        message: 'Unauthorized: Invalid or missing API key for detailed health information.'
+      });
+      return;
+    }
+
     healthData.detailed = {
       memory: {
         rss: Math.floor(process.memoryUsage().rss / 1024 / 1024) + 'MB',
@@ -209,17 +226,34 @@ function createReconnectionToken(playerId, roomCode) {
   return token;
 }
 
+/**
+ * Validate reconnection token using constant-time comparison to prevent timing attacks
+ * @param {string} playerId - Player's socket ID
+ * @param {string} token - Reconnection token to validate
+ * @returns {string|false} - Room code if valid, false otherwise
+ */
 function validateReconnectionToken(playerId, token) {
   const tokenData = reconnectionTokens.get(playerId);
 
   if (!tokenData) return false;
-  if (tokenData.token !== token) return false;
+
+  // Check expiration first
   if (Date.now() > tokenData.expiresAt) {
     reconnectionTokens.delete(playerId);
     return false;
   }
 
-  return tokenData.roomCode;
+  // Constant-time comparison to prevent timing attacks
+  try {
+    const isValid = timingSafeEqual(
+      Buffer.from(tokenData.token, 'hex'),
+      Buffer.from(token, 'hex')
+    );
+    return isValid ? tokenData.roomCode : false;
+  } catch {
+    // Invalid hex string or length mismatch
+    return false;
+  }
 }
 
 function cleanupExpiredTokens() {
@@ -432,6 +466,23 @@ io.on('connection', (socket) => {
 
   // Handle player reconnection
   socket.on('player:reconnect', safeHandler(({ playerId, reconnectionToken }) => {
+    // Input validation
+    if (!playerId || typeof playerId !== 'string' || playerId.length > 100) {
+      socket.emit('error', {
+        message: 'Invalid player ID format.',
+        code: 'INVALID_INPUT'
+      });
+      return;
+    }
+
+    if (!reconnectionToken || typeof reconnectionToken !== 'string' || reconnectionToken.length !== 64) {
+      socket.emit('error', {
+        message: 'Invalid reconnection token format.',
+        code: 'INVALID_INPUT'
+      });
+      return;
+    }
+
     // Validate token
     const roomCode = validateReconnectionToken(playerId, reconnectionToken);
 
