@@ -6,8 +6,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import { timingSafeEqual } from 'crypto';
 import { validateMove, checkWinCondition } from './game/validation.js';
-import { STARTING_STATIONS } from './game/constants.js';
+import { STARTING_STATIONS, GAME_STATUS } from './game/constants.js';
 
 dotenv.config();
 
@@ -103,20 +104,89 @@ app.use(httpLimiter);
 // Rate limiting map for Socket.IO (simple in-memory, would use Redis in production)
 const rateLimits = new Map();
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    activeGames: activeGames.size,
-    activePlayers: activePlayers.size
-  });
-});
+// Socket.IO health tracking
+let socketIOHealthy = true;
+let lastSocketConnection = Date.now();
+let totalConnections = 0;
 
 // Active games storage (in-memory for MVP)
 const activeGames = new Map();
 const activePlayers = new Map();
+
+// Player reconnection tokens (playerId -> {token, roomCode, expiresAt})
+const reconnectionTokens = new Map();
+const RECONNECTION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+const STALE_CONNECTION_THRESHOLD = RECONNECTION_TIMEOUT; // Same as reconnection timeout
+
+// Enhanced health check endpoint with Socket.IO verification
+app.get('/health', (req, res) => {
+  const now = Date.now();
+  const timeSinceLastConnection = now - lastSocketConnection;
+  const detailedMode = req.query.detailed === 'true';
+
+  // Check for stale connections - if we have rooms but no connections in threshold time, something's wrong
+  const hasActiveRooms = activeGames.size > 0;
+  const staleConnections = hasActiveRooms && timeSinceLastConnection > STALE_CONNECTION_THRESHOLD;
+
+  // Determine overall health status
+  const isHealthy = socketIOHealthy && !staleConnections;
+  const status = isHealthy ? 'OK' : 'DEGRADED';
+
+  // Optimize room stats calculation - single iteration instead of multiple filter passes
+  const roomStats = { total: activeGames.size, inGame: 0, waiting: 0 };
+  for (const game of activeGames.values()) {
+    if (game.status === GAME_STATUS.PLAYING) roomStats.inGame++;
+    else if (game.status === GAME_STATUS.WAITING) roomStats.waiting++;
+  }
+
+  const healthData = {
+    status,
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    socketIO: {
+      healthy: socketIOHealthy,
+      connectedClients: io.engine.clientsCount || 0,
+      lastConnection: new Date(lastSocketConnection).toISOString(),
+      timeSinceLastConnection: Math.floor(timeSinceLastConnection / 1000) + 's',
+      totalConnectionsLifetime: totalConnections
+    },
+    rooms: roomStats,
+    players: {
+      total: activePlayers.size
+    }
+  };
+
+  // Add detailed information if requested (with optional authentication)
+  if (detailedMode) {
+    // If HEALTH_API_KEY is set, require it for detailed mode
+    // Only accept via header for security (not in query params which get logged)
+    const healthApiKey = process.env.HEALTH_API_KEY;
+    const providedKey = req.headers['x-api-key'];
+
+    if (healthApiKey && providedKey !== healthApiKey) {
+      res.status(401).json({
+        status: 'ERROR',
+        message: 'Unauthorized: Invalid or missing API key for detailed health information.'
+      });
+      return;
+    }
+
+    healthData.detailed = {
+      memory: {
+        rss: Math.floor(process.memoryUsage().rss / 1024 / 1024) + 'MB',
+        heapUsed: Math.floor(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        heapTotal: Math.floor(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+      },
+      rateLimits: {
+        activeEntries: rateLimits.size
+      }
+    };
+  }
+
+  // Return appropriate HTTP status code
+  const httpStatus = isHealthy ? 200 : 503;
+  res.status(httpStatus).json(healthData);
+});
 
 // Configuration constants
 const MAX_CONCURRENT_GAMES = 100; // Prevent memory exhaustion
@@ -141,6 +211,66 @@ function validatePlayerName(name) {
 function validateRoomCode(code) {
   if (!code || typeof code !== 'string') return false;
   return /^[A-F0-9]{6}$/.test(code);
+}
+
+// Reconnection token management
+function createReconnectionToken(playerId, roomCode) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + RECONNECTION_TIMEOUT;
+
+  reconnectionTokens.set(playerId, {
+    token,
+    roomCode,
+    expiresAt
+  });
+
+  return token;
+}
+
+/**
+ * Validate reconnection token using constant-time comparison to prevent timing attacks
+ * @param {string} playerId - Player's socket ID
+ * @param {string} token - Reconnection token to validate
+ * @returns {string|false} - Room code if valid, false otherwise
+ */
+function validateReconnectionToken(playerId, token) {
+  const tokenData = reconnectionTokens.get(playerId);
+
+  if (!tokenData) return false;
+
+  // Check expiration first
+  if (Date.now() > tokenData.expiresAt) {
+    reconnectionTokens.delete(playerId);
+    return false;
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  try {
+    const isValid = timingSafeEqual(
+      Buffer.from(tokenData.token, 'hex'),
+      Buffer.from(token, 'hex')
+    );
+    return isValid ? tokenData.roomCode : false;
+  } catch {
+    // Invalid hex string or length mismatch
+    return false;
+  }
+}
+
+function cleanupExpiredTokens() {
+  const now = Date.now();
+  let cleaned = 0;
+
+  for (const [playerId, tokenData] of reconnectionTokens.entries()) {
+    if (now > tokenData.expiresAt) {
+      reconnectionTokens.delete(playerId);
+      cleaned++;
+    }
+  }
+
+  if (cleaned > 0) {
+    console.log(`[Cleanup] Removed ${cleaned} expired reconnection tokens`);
+  }
 }
 
 // Secure room code generation using crypto
@@ -270,13 +400,21 @@ function cleanupRateLimits() {
   }
 }
 
-// Run cleanup at configured interval
+// Run cleanup at configured interval (staggered to avoid CPU spikes)
 setInterval(cleanupGames, TIMEOUTS.CLEANUP_INTERVAL);
-setInterval(cleanupRateLimits, TIMEOUTS.CLEANUP_INTERVAL);
+// Offset by 20 seconds to distribute CPU load
+setTimeout(() => setInterval(cleanupRateLimits, TIMEOUTS.CLEANUP_INTERVAL), 20000);
+// Offset by 40 seconds to distribute CPU load
+setTimeout(() => setInterval(cleanupExpiredTokens, TIMEOUTS.CLEANUP_INTERVAL), 40000);
 
 // Socket.IO connection handling with error handling wrapper
 io.on('connection', (socket) => {
   console.log(`[${new Date().toISOString()}] Client connected: ${socket.id}`);
+
+  // Update Socket.IO health tracking
+  lastSocketConnection = Date.now();
+  totalConnections++;
+  socketIOHealthy = true;
 
   // Wrap all socket handlers with error handling
   const safeHandler = (handler) => {
@@ -327,6 +465,100 @@ io.on('connection', (socket) => {
     });
 
     console.log(`Player ${sanitizedName} (${socket.id}) joined lobby`);
+  }));
+
+  // Handle player reconnection
+  socket.on('player:reconnect', safeHandler(({ playerId, reconnectionToken }) => {
+    // Input validation
+    if (!playerId || typeof playerId !== 'string' || playerId.length > 100) {
+      socket.emit('error', {
+        message: 'Invalid player ID format.',
+        code: 'INVALID_INPUT'
+      });
+      return;
+    }
+
+    if (!reconnectionToken || typeof reconnectionToken !== 'string' || reconnectionToken.length !== 64) {
+      socket.emit('error', {
+        message: 'Invalid reconnection token format.',
+        code: 'INVALID_INPUT'
+      });
+      return;
+    }
+
+    // Validate token
+    const roomCode = validateReconnectionToken(playerId, reconnectionToken);
+
+    if (!roomCode) {
+      socket.emit('error', {
+        message: 'Invalid or expired reconnection token. Please rejoin the game.',
+        code: 'INVALID_RECONNECTION_TOKEN'
+      });
+      return;
+    }
+
+    const room = activeGames.get(roomCode);
+    if (!room) {
+      socket.emit('error', {
+        message: 'Game room no longer exists.',
+        code: 'ROOM_NOT_FOUND'
+      });
+      reconnectionTokens.delete(playerId);
+      return;
+    }
+
+    // Find the player in the room
+    const playerIndex = room.players.findIndex(p => p.id === playerId);
+    if (playerIndex === -1) {
+      socket.emit('error', {
+        message: 'Player not found in room.',
+        code: 'PLAYER_NOT_FOUND'
+      });
+      reconnectionTokens.delete(playerId);
+      return;
+    }
+
+    // Update player's socket ID and mark as connected
+    const oldSocketId = room.players[playerIndex].id;
+
+    // Explicitly disconnect old socket if still connected (prevents duplicate connections)
+    const oldSocket = io.sockets.sockets.get(oldSocketId);
+    if (oldSocket) {
+      oldSocket.disconnect(true);
+      console.log(`[Reconnection] Disconnected old socket ${oldSocketId}`);
+    }
+
+    room.players[playerIndex].id = socket.id;
+    room.players[playerIndex].connected = true;
+
+    // Update active players mapping
+    activePlayers.delete(oldSocketId);
+    activePlayers.set(socket.id, {
+      id: socket.id,
+      name: room.players[playerIndex].name,
+      connectedAt: Date.now()
+    });
+
+    // Join the socket room
+    socket.join(roomCode);
+
+    // Clear the reconnection token
+    reconnectionTokens.delete(playerId);
+
+    // Notify the player about successful reconnection
+    socket.emit('player:reconnected', {
+      roomCode,
+      room: getFilteredRoomForPlayer(room, socket.id),
+      message: 'Successfully reconnected to the game!'
+    });
+
+    // Notify other players
+    io.to(roomCode).emit('player:reconnected:broadcast', {
+      playerId: socket.id,
+      playerName: room.players[playerIndex].name
+    });
+
+    console.log(`[Reconnection] Player ${room.players[playerIndex].name} (${oldSocketId} -> ${socket.id}) reconnected to room ${roomCode}`);
   }));
 
   // Handle room creation
@@ -689,17 +921,23 @@ io.on('connection', (socket) => {
     // Remove player from active players
     activePlayers.delete(socket.id);
 
-    // Mark player as disconnected in all rooms
+    // Mark player as disconnected in all rooms and create reconnection token
     for (const [roomCode, room] of activeGames.entries()) {
       const playerIndex = room.players.findIndex(p => p.id === socket.id);
 
       if (playerIndex !== -1) {
         room.players[playerIndex].connected = false;
 
-        // Notify other players
+        // Create reconnection token for the player
+        const reconnectionToken = createReconnectionToken(socket.id, roomCode);
+        console.log(`[Reconnection] Token created for player ${room.players[playerIndex].name} in room ${roomCode}`);
+
+        // Notify other players about disconnection
         io.to(roomCode).emit('player:disconnected', {
           playerId: socket.id,
-          playerName: room.players[playerIndex].name
+          playerName: room.players[playerIndex].name,
+          canReconnect: true,
+          reconnectTimeout: RECONNECTION_TIMEOUT / 1000 // in seconds
         });
 
         // Clean up room if all players disconnected
