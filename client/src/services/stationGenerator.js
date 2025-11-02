@@ -48,7 +48,7 @@ export async function generateGameBoard(address, stationCount = null) {
 
     // Step 4: Detect intersections
     console.log('\n⚡ Step 4: Detecting intersections...');
-    const intersections = detectIntersections(roads, 3);  // Minimum 3 roads
+    const intersections = detectIntersections(roads, 2);  // Minimum 2 roads (any intersection)
 
     if (intersections.length === 0) {
       throw new Error('No intersections found. This area may be too sparse. Try a more urban location.');

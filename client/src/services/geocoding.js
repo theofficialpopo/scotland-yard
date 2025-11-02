@@ -16,8 +16,8 @@ export const AREA_TYPES = {
     id: 'MAJOR_CITY',
     name: 'Major City',
     description: 'Large metropolitan area (>1M population)',
-    roadClasses: ['motorway', 'trunk', 'primary'],  // Only major roads
-    minRoadSpacing: 500,  // meters between stations
+    roadClasses: ['motorway', 'trunk', 'primary', 'secondary'],  // Include secondary roads
+    minRoadSpacing: 400,  // meters between stations
     stationCount: 20,
     searchRadius: 2000    // meters
   },

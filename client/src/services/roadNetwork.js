@@ -26,7 +26,7 @@ export async function fetchRoadNetwork(center, roadClasses, radiusMeters = 2000)
 
   // Mapbox Tilequery API
   // Fetch road features within radius
-  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?radius=${radiusMeters}&layers=road&limit=50&access_token=${MAPBOX_TOKEN}`;
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?radius=${radiusMeters}&layers=road&limit=150&access_token=${MAPBOX_TOKEN}`;
 
   try {
     const response = await fetch(url);
