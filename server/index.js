@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { timingSafeEqual } from 'crypto';
 import { validateMove, checkWinCondition } from './game/validation.js';
-import { STARTING_STATIONS } from './game/constants.js';
+import { STARTING_STATIONS, GAME_STATUS } from './game/constants.js';
 
 dotenv.config();
 
@@ -135,8 +135,8 @@ app.get('/health', (req, res) => {
   // Optimize room stats calculation - single iteration instead of multiple filter passes
   const roomStats = { total: activeGames.size, inGame: 0, waiting: 0 };
   for (const game of activeGames.values()) {
-    if (game.status === 'IN_PROGRESS') roomStats.inGame++;
-    else if (game.status === 'WAITING') roomStats.waiting++;
+    if (game.status === GAME_STATUS.PLAYING) roomStats.inGame++;
+    else if (game.status === GAME_STATUS.WAITING) roomStats.waiting++;
   }
 
   const healthData = {
@@ -159,8 +159,9 @@ app.get('/health', (req, res) => {
   // Add detailed information if requested (with optional authentication)
   if (detailedMode) {
     // If HEALTH_API_KEY is set, require it for detailed mode
+    // Only accept via header for security (not in query params which get logged)
     const healthApiKey = process.env.HEALTH_API_KEY;
-    const providedKey = req.query.apiKey || req.headers['x-api-key'];
+    const providedKey = req.headers['x-api-key'];
 
     if (healthApiKey && providedKey !== healthApiKey) {
       res.status(401).json({
@@ -399,10 +400,12 @@ function cleanupRateLimits() {
   }
 }
 
-// Run cleanup at configured interval
+// Run cleanup at configured interval (staggered to avoid CPU spikes)
 setInterval(cleanupGames, TIMEOUTS.CLEANUP_INTERVAL);
-setInterval(cleanupRateLimits, TIMEOUTS.CLEANUP_INTERVAL);
-setInterval(cleanupExpiredTokens, TIMEOUTS.CLEANUP_INTERVAL);
+// Offset by 20 seconds to distribute CPU load
+setTimeout(() => setInterval(cleanupRateLimits, TIMEOUTS.CLEANUP_INTERVAL), 20000);
+// Offset by 40 seconds to distribute CPU load
+setTimeout(() => setInterval(cleanupExpiredTokens, TIMEOUTS.CLEANUP_INTERVAL), 40000);
 
 // Socket.IO connection handling with error handling wrapper
 io.on('connection', (socket) => {
@@ -517,6 +520,14 @@ io.on('connection', (socket) => {
 
     // Update player's socket ID and mark as connected
     const oldSocketId = room.players[playerIndex].id;
+
+    // Explicitly disconnect old socket if still connected (prevents duplicate connections)
+    const oldSocket = io.sockets.sockets.get(oldSocketId);
+    if (oldSocket) {
+      oldSocket.disconnect(true);
+      console.log(`[Reconnection] Disconnected old socket ${oldSocketId}`);
+    }
+
     room.players[playerIndex].id = socket.id;
     room.players[playerIndex].connected = true;
 
