@@ -147,6 +147,7 @@ function MapTest() {
           >
             {station.id}
           </div>
+          </Marker>
         ))}
       </MapDisplay>
 
