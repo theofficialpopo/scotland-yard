@@ -411,3 +411,37 @@ export const connections = [
   { from: 115, to: 157, types: ['ferry'] },
   { from: 157, to: 194, types: ['ferry'] }
 ];
+
+/**
+ * Calculate available ticket types for each station
+ * Returns a Map of stationId => Set of ticket types
+ */
+export function getStationTicketTypes() {
+  const stationTickets = new Map();
+
+  // Initialize all stations with empty sets
+  Object.keys(stations).forEach(stationId => {
+    stationTickets.set(parseInt(stationId), new Set());
+  });
+
+  // Iterate through connections and add ticket types
+  connections.forEach(conn => {
+    const fromId = conn.from;
+    const toId = conn.to;
+
+    // Connections are bidirectional
+    conn.types.forEach(type => {
+      if (stationTickets.has(fromId)) {
+        stationTickets.get(fromId).add(type);
+      }
+      if (stationTickets.has(toId)) {
+        stationTickets.get(toId).add(type);
+      }
+    });
+  });
+
+  return stationTickets;
+}
+
+// Pre-calculate and export station ticket types
+export const stationTicketTypes = getStationTicketTypes();

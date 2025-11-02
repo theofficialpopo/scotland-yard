@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { stations, connections } from '../data/londonMap';
+import { stations, connections, stationTicketTypes } from '../data/londonMap';
+import StationMarker from './StationMarker';
 
 function Board({ room, playerId, emit }) {
   const [selectedStation, setSelectedStation] = useState(null);
@@ -176,9 +177,10 @@ function Board({ room, playerId, emit }) {
           width: '100%',
           maxWidth: '1100px',
           height: 'auto',
-          border: '2px solid #ccc',
-          borderRadius: '8px',
-          background: '#fafafa'
+          border: '4px solid #8B4513',
+          borderRadius: '4px',
+          background: '#F0E6D2',
+          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(139, 69, 19, 0.1)'
         }}
       >
         {/* Render connections */}
@@ -188,9 +190,11 @@ function Board({ room, playerId, emit }) {
 
           if (!from || !to) return null;
 
+          // Authentic Scotland Yard colors
           const color = conn.types[0] === 'taxi' ? '#FDB913' :
-                       conn.types[0] === 'bus' ? '#00B140' :
-                       conn.types[0] === 'underground' ? '#EE1C25' :
+                       conn.types[0] === 'bus' ? '#00A651' :
+                       conn.types[0] === 'underground' ? '#DC241F' :
+                       conn.types[0] === 'ferry' ? '#0098D4' :
                        '#999';
 
           return (
@@ -201,65 +205,85 @@ function Board({ room, playerId, emit }) {
               x2={to.x}
               y2={to.y}
               stroke={color}
-              strokeWidth="2"
-              strokeDasharray={conn.types[0] === 'underground' ? '5,5' : '0'}
+              strokeWidth="3.5"
+              strokeDasharray={conn.types[0] === 'underground' ? '8,4' : '0'}
+              strokeLinecap="round"
               className="connection"
-              opacity="0.6"
+              opacity="0.8"
+              style={{
+                filter: 'drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2))'
+              }}
             />
           );
         })}
 
-        {/* Render stations */}
+        {/* Render stations with new StationMarker component */}
         {Object.entries(stations).map(([id, station]) => {
           const stationId = parseInt(id);
           const isSelected = stationId === selectedStation;
           const isReachable = isMyTurn && reachableStations.has(stationId);
           const isCurrent = stationId === currentPosition;
+          const availableTickets = stationTicketTypes.get(stationId) || new Set();
 
           return (
-            <g key={`station-${id}`}>
-              <circle
-                cx={station.x}
-                cy={station.y}
-                r={isSelected ? 10 : isCurrent ? 8 : 6}
-                fill={isSelected ? '#007bff' : isCurrent ? '#28a745' : isReachable ? '#ffc107' : '#fff'}
-                stroke="#333"
-                strokeWidth={isSelected ? 3 : isCurrent ? 2 : 1}
-                className="station"
-                onClick={() => handleStationClick(stationId)}
-                style={{ cursor: isReachable ? 'pointer' : 'default', opacity: isReachable || !isMyTurn ? 1 : 0.5 }}
-              />
-              <text
-                x={station.x}
-                y={station.y - 12}
-                fontSize="10"
-                textAnchor="middle"
-                fill="#333"
-                pointerEvents="none"
-              >
-                {id}
-              </text>
-            </g>
+            <StationMarker
+              key={`station-${id}`}
+              stationId={stationId}
+              x={station.x}
+              y={station.y}
+              availableTickets={availableTickets}
+              isSelected={isSelected}
+              isReachable={isReachable}
+              isCurrent={isCurrent}
+              onClick={() => handleStationClick(stationId)}
+            />
           );
         })}
 
-        {/* Render player pieces */}
+        {/* Render player pieces with board game styling */}
         {room.players.map((player, i) => {
           if (player.role === 'mrX' && room.gameState.mrX.position) {
             const pos = stations[room.gameState.mrX.position];
             if (!pos) return null;
 
             return (
-              <circle
-                key={`player-${player.id}`}
-                cx={pos.x}
-                cy={pos.y}
-                r="15"
-                fill="#000"
-                stroke="#fff"
-                strokeWidth="2"
-                className="player-piece"
-              />
+              <g key={`player-${player.id}`}>
+                {/* Shadow */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r="16"
+                  fill="rgba(0, 0, 0, 0.3)"
+                  filter="blur(2px)"
+                />
+                {/* Player piece */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r="16"
+                  fill="#1a1a1a"
+                  stroke="#fff"
+                  strokeWidth="3"
+                  className="player-piece"
+                  style={{
+                    filter: 'drop-shadow(0px 3px 4px rgba(0, 0, 0, 0.4))'
+                  }}
+                />
+                {/* Mr. X label */}
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="'Arial', sans-serif"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#fff"
+                  pointerEvents="none"
+                >
+                  X
+                </text>
+              </g>
             );
           } else if (player.role === 'detective' && player.detectiveIndex !== null) {
             const detectivePos = room.gameState.detectives[player.detectiveIndex]?.position;
@@ -269,19 +293,48 @@ function Board({ room, playerId, emit }) {
             const pos = stations[detectivePos];
             if (!pos) return null;
 
-            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7'];
+            // More vibrant, board game-style detective colors
+            const colors = ['#E74C3C', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6'];
+            const color = colors[player.detectiveIndex % colors.length];
 
             return (
-              <circle
-                key={`player-${player.id}`}
-                cx={pos.x}
-                cy={pos.y}
-                r="15"
-                fill={colors[player.detectiveIndex % colors.length]}
-                stroke="#fff"
-                strokeWidth="2"
-                className="player-piece"
-              />
+              <g key={`player-${player.id}`}>
+                {/* Shadow */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y + 2}
+                  r="16"
+                  fill="rgba(0, 0, 0, 0.3)"
+                  filter="blur(2px)"
+                />
+                {/* Player piece */}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r="16"
+                  fill={color}
+                  stroke="#fff"
+                  strokeWidth="3"
+                  className="player-piece"
+                  style={{
+                    filter: 'drop-shadow(0px 3px 4px rgba(0, 0, 0, 0.4))'
+                  }}
+                />
+                {/* Detective number */}
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  fontSize="10"
+                  fontWeight="bold"
+                  fontFamily="'Arial', sans-serif"
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#fff"
+                  pointerEvents="none"
+                >
+                  {player.detectiveIndex + 1}
+                </text>
+              </g>
             );
           }
           return null;
