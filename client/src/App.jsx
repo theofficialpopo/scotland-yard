@@ -13,6 +13,7 @@ function App() {
   const [playerId, setPlayerId] = useState(null);
   const [error, setError] = useState(null);
   const [gameEndData, setGameEndData] = useState(null);
+  const [selectedMrX, setSelectedMrX] = useState(null); // null = random, or player ID
 
   // Track all unsubscribe functions to prevent memory leaks
   const cleanupFunctions = useRef([]);
@@ -130,7 +131,7 @@ function App() {
 
   const handleStartGame = () => {
     if (roomCode) {
-      emit('game:start', { roomCode });
+      emit('game:start', { roomCode, mrXPlayerId: selectedMrX });
     }
   };
 
@@ -140,6 +141,7 @@ function App() {
     setRoom(null);
     setError(null);
     setGameEndData(null);
+    setSelectedMrX(null); // Reset role selection
   };
 
   const handleRematch = () => {
@@ -254,6 +256,64 @@ function App() {
           <h3 style={{ borderBottom: '2px solid #8B4513', paddingBottom: '10px' }}>
             Players ({room.players.length}/{room.maxPlayers})
           </h3>
+
+          {/* Role Selection - Only visible to host */}
+          {room.host === playerId && (
+            <div style={{
+              background: 'rgba(70, 60, 50, 0.7)',
+              border: '2px solid #FFD700',
+              borderRadius: '8px',
+              padding: '15px',
+              marginBottom: '20px'
+            }}>
+              <h4 style={{ marginTop: 0, marginBottom: '10px', color: '#FFD700', fontSize: '14px' }}>
+                👑 Host Settings: Mr. X Role
+              </h4>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setSelectedMrX(null)}
+                  style={{
+                    padding: '6px 12px',
+                    background: selectedMrX === null ? '#4CAF50' : 'rgba(50, 45, 40, 0.8)',
+                    color: '#fff',
+                    border: `2px solid ${selectedMrX === null ? '#FFD700' : '#8B4513'}`,
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  🎲 Random
+                </button>
+                {room.players.map((player) => (
+                  <button
+                    key={player.id}
+                    onClick={() => setSelectedMrX(player.id)}
+                    style={{
+                      padding: '6px 12px',
+                      background: selectedMrX === player.id ? '#4CAF50' : 'rgba(50, 45, 40, 0.8)',
+                      color: '#fff',
+                      border: `2px solid ${selectedMrX === player.id ? '#FFD700' : '#8B4513'}`,
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {player.name}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: '11px', color: '#999', margin: '8px 0 0 0' }}>
+                {selectedMrX === null
+                  ? 'Mr. X will be randomly assigned'
+                  : `${room.players.find(p => p.id === selectedMrX)?.name} will be Mr. X`}
+              </p>
+            </div>
+          )}
+
           <div style={{ marginBottom: '25px' }}>
             {room.players.map((player) => (
               <div

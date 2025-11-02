@@ -716,7 +716,7 @@ io.on('connection', (socket) => {
   }));
 
   // Handle game start
-  socket.on('game:start', safeHandler(({ roomCode }) => {
+  socket.on('game:start', safeHandler(({ roomCode, mrXPlayerId = null }) => {
     if (!validateRoomCode(roomCode)) {
       socket.emit('error', { message: 'Invalid room code', code: 'INVALID_ROOM_CODE' });
       return;
@@ -739,8 +739,22 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Assign roles: randomly select one player as Mr. X, others are detectives
-    const mrXIndex = Math.floor(Math.random() * room.players.length);
+    // Assign roles: use specified Mr. X or randomly select
+    let mrXIndex;
+
+    if (mrXPlayerId) {
+      // Host specified a player to be Mr. X
+      mrXIndex = room.players.findIndex(p => p.id === mrXPlayerId);
+
+      // If the specified player is not found, default to random
+      if (mrXIndex === -1) {
+        console.log(`Specified Mr. X player ${mrXPlayerId} not found, selecting randomly`);
+        mrXIndex = Math.floor(Math.random() * room.players.length);
+      }
+    } else {
+      // Randomly select Mr. X
+      mrXIndex = Math.floor(Math.random() * room.players.length);
+    }
 
     let detectiveIndex = 0;
     for (let i = 0; i < room.players.length; i++) {
@@ -793,6 +807,7 @@ io.on('connection', (socket) => {
     });
 
     console.log(`Game started in room ${roomCode} with ${room.players.length} players`);
+    console.log(`Mr. X: ${room.players[mrXIndex].name} ${mrXPlayerId ? '(manually selected)' : '(random)'}`);
     console.log(`Starting positions: Mr. X at ${room.gameState.mrX.position}, Detectives at ${room.gameState.detectives.map(d => d.position).join(', ')}`);
   }));
 
