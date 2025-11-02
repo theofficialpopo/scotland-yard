@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// In production, connect to same origin (backend serves frontend)
+// In development, connect to separate backend server
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ||
+  (import.meta.env.MODE === 'production' ? window.location.origin : 'http://localhost:3000');
 
 // Warn if VITE_SOCKET_URL is not set in production
 if (import.meta.env.MODE === 'production' && !import.meta.env.VITE_SOCKET_URL) {

@@ -7,8 +7,13 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { timingSafeEqual } from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { validateMove, checkWinCondition } from './game/validation.js';
 import { STARTING_STATIONS, GAME_STATUS } from './game/constants.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -100,6 +105,12 @@ const httpLimiter = rateLimit({
 
 // Apply rate limiting to all routes
 app.use(httpLimiter);
+
+// Serve frontend static files in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = join(__dirname, '../client/dist');
+  app.use(express.static(clientBuildPath));
+}
 
 // Rate limiting map for Socket.IO (simple in-memory, would use Redis in production)
 const rateLimits = new Map();
@@ -950,6 +961,13 @@ io.on('connection', (socket) => {
     }
   });
 });
+
+// Catch-all route for SPA routing (must be last)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(join(__dirname, '../client/dist/index.html'));
+  });
+}
 
 // Start server
 const PORT = process.env.PORT || 3001;
