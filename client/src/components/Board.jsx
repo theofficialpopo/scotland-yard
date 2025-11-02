@@ -3,6 +3,7 @@ import { stations, connections } from '../data/londonMap';
 
 function Board({ room, playerId, emit }) {
   const [selectedStation, setSelectedStation] = useState(null);
+  const [useDoubleMove, setUseDoubleMove] = useState(false);
 
   if (!room || !room.gameState) {
     return (
@@ -75,19 +76,35 @@ function Board({ room, playerId, emit }) {
     if (!selectedStation || !isMyTurn || !currentPosition) return;
 
     // Validate that the move is legal with this ticket type
-    if (!areStationsConnected(currentPosition, selectedStation, ticketType)) {
-      console.error('Invalid move: stations not connected by this ticket type');
-      return;
+    // Black tickets can use any connection type (taxi, bus, underground, ferry)
+    if (ticketType === 'black') {
+      const hasAnyConnection =
+        areStationsConnected(currentPosition, selectedStation, 'taxi') ||
+        areStationsConnected(currentPosition, selectedStation, 'bus') ||
+        areStationsConnected(currentPosition, selectedStation, 'underground') ||
+        areStationsConnected(currentPosition, selectedStation, 'ferry');
+
+      if (!hasAnyConnection) {
+        console.error('Invalid move: stations not connected');
+        return;
+      }
+    } else {
+      if (!areStationsConnected(currentPosition, selectedStation, ticketType)) {
+        console.error('Invalid move: stations not connected by this ticket type');
+        return;
+      }
     }
 
     emit('game:move', {
       roomCode: room.code,
       from: currentPosition,
       to: selectedStation,
-      ticketType
+      ticketType,
+      useDoubleMove: useDoubleMove
     });
 
     setSelectedStation(null);
+    setUseDoubleMove(false); // Reset double-move flag after use
   };
 
   return (
@@ -218,6 +235,34 @@ function Board({ room, playerId, emit }) {
       {selectedStation && isMyTurn && currentPosition && (
         <div style={{ marginTop: '15px' }}>
           <p><strong>Selected Station:</strong> {selectedStation}</p>
+
+          {/* Double-move option for Mr. X */}
+          {myPlayer?.role === 'mrX' && room.gameState.mrX.doubleMoves > 0 && !room.gameState.doubleMoveInProgress && (
+            <div style={{ marginBottom: '10px', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={useDoubleMove}
+                  onChange={(e) => setUseDoubleMove(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontWeight: 'bold' }}>
+                  Use Double-Move Card ({room.gameState.mrX.doubleMoves} remaining)
+                </span>
+              </label>
+              <p style={{ fontSize: '12px', color: '#666', margin: '5px 0 0 26px' }}>
+                Move twice in a row this turn
+              </p>
+            </div>
+          )}
+
+          {/* Show indicator if double-move is in progress */}
+          {room.gameState.doubleMoveInProgress && isMyTurn && (
+            <div style={{ marginBottom: '10px', padding: '10px', background: '#fff3cd', borderRadius: '4px', border: '1px solid #ffc107' }}>
+              <strong>🎯 Double-Move Active!</strong> Make your second move.
+            </div>
+          )}
+
           <p>Choose a ticket type:</p>
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             {(() => {

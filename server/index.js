@@ -454,6 +454,7 @@ io.on('connection', (socket) => {
       maxRounds: 24,
       revealRounds: [3, 8, 13, 18, 24],
       currentPlayerIndex: 0, // Start with Mr. X
+      doubleMoveInProgress: false, // Track if Mr. X is in the middle of a double-move
       mrX: {
         position: null, // Will be set by assignStartingPositions
         tickets: { taxi: 4, bus: 3, underground: 3, black: room.players.length - 1 },
@@ -485,7 +486,7 @@ io.on('connection', (socket) => {
   }));
 
   // Handle player move
-  socket.on('game:move', safeHandler(({ roomCode, from, to, ticketType }) => {
+  socket.on('game:move', safeHandler(({ roomCode, from, to, ticketType, useDoubleMove = false }) => {
     if (!validateRoomCode(roomCode)) {
       socket.emit('error', { message: 'Invalid room code', code: 'INVALID_ROOM_CODE' });
       return;
@@ -503,6 +504,22 @@ io.on('connection', (socket) => {
     if (currentPlayer.id !== socket.id) {
       socket.emit('error', { message: 'Not your turn', code: 'NOT_YOUR_TURN' });
       return;
+    }
+
+    // Validate double-move usage (only Mr. X can use, and must have cards available)
+    if (useDoubleMove) {
+      if (currentPlayer.role !== 'mrX') {
+        socket.emit('error', { message: 'Only Mr. X can use double-move cards', code: 'INVALID_DOUBLE_MOVE' });
+        return;
+      }
+      if (room.gameState.mrX.doubleMoves <= 0) {
+        socket.emit('error', { message: 'No double-move cards remaining', code: 'NO_DOUBLE_MOVES' });
+        return;
+      }
+      if (room.gameState.doubleMoveInProgress) {
+        socket.emit('error', { message: 'Double-move already in progress', code: 'DOUBLE_MOVE_IN_PROGRESS' });
+        return;
+      }
     }
 
     // Validate move using validation module
@@ -530,6 +547,22 @@ io.on('connection', (socket) => {
         ticketType,
         revealed: room.gameState.revealRounds.includes(room.gameState.currentRound)
       });
+
+      // Handle double-move card
+      if (useDoubleMove && !room.gameState.doubleMoveInProgress) {
+        // Start double-move: Mr. X gets another turn immediately
+        room.gameState.doubleMoveInProgress = true;
+        room.gameState.mrX.doubleMoves--;
+        // Don't advance turn - Mr. X moves again
+      } else if (room.gameState.doubleMoveInProgress) {
+        // Second move of double-move: now advance turn normally
+        room.gameState.doubleMoveInProgress = false;
+        // Advance turn
+        room.gameState.currentPlayerIndex++;
+      } else {
+        // Normal Mr. X move without double-move
+        room.gameState.currentPlayerIndex++;
+      }
     } else {
       // Update detective position and tickets
       const detectiveIndex = currentPlayer.detectiveIndex;
@@ -538,12 +571,12 @@ io.on('connection', (socket) => {
 
       // Transfer ticket to Mr. X
       room.gameState.mrX.tickets[ticketType]++;
+
+      // Advance turn
+      room.gameState.currentPlayerIndex++;
     }
 
     room.lastActivity = Date.now();
-
-    // Advance turn
-    room.gameState.currentPlayerIndex++;
 
     // If all players have moved, start new round
     if (room.gameState.currentPlayerIndex >= room.players.length) {

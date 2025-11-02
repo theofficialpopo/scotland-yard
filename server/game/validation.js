@@ -43,22 +43,23 @@ export function validateMove(move, player, gameState) {
 
   // Check if stations are connected by this ticket type
   if (ticketType === TICKET_TYPES.BLACK) {
-    // Black ticket can use any connection type
+    // Black ticket can use any connection type including ferry
     const hasConnection = areStationsConnected(from, to, TICKET_TYPES.TAXI) ||
                          areStationsConnected(from, to, TICKET_TYPES.BUS) ||
-                         areStationsConnected(from, to, TICKET_TYPES.UNDERGROUND);
+                         areStationsConnected(from, to, TICKET_TYPES.UNDERGROUND) ||
+                         areStationsConnected(from, to, TICKET_TYPES.FERRY);
 
-    // Check for ferry (Mr. X only)
-    const isFerry = FERRY_STATIONS.includes(from) && FERRY_STATIONS.includes(to);
-
-    if (!hasConnection && !isFerry) {
+    if (!hasConnection) {
       return { valid: false, error: 'Stations are not connected' };
     }
 
-    // Only Mr. X can use ferry
-    if (isFerry && player.role !== 'mrX') {
-      return { valid: false, error: 'Only Mr. X can use the ferry' };
+    // Only Mr. X can use black tickets (which includes ferry)
+    if (player.role !== 'mrX') {
+      return { valid: false, error: 'Only Mr. X can use black tickets' };
     }
+  } else if (ticketType === TICKET_TYPES.FERRY) {
+    // Ferry requires black ticket and only Mr. X can use it
+    return { valid: false, error: 'Ferry can only be used with black tickets' };
   } else {
     if (!areStationsConnected(from, to, ticketType)) {
       return { valid: false, error: `Stations are not connected by ${ticketType}` };
