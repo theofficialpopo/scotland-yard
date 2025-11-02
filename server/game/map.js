@@ -20,11 +20,11 @@ export const stations = {
 
   // EAST SIDE (Right bank - across the river)
   9: { x: 650, y: 600, connections: [10, 12] },
-  10: { x: 650, y: 450, connections: [9, 11, 13, 18] },
+  10: { x: 650, y: 450, connections: [9, 11, 18] },
   11: { x: 650, y: 300, connections: [10, 14, 15] },
-  12: { x: 800, y: 600, connections: [9, 13] },
-  13: { x: 800, y: 450, connections: [10, 12, 14] },
-  14: { x: 800, y: 300, connections: [11, 13, 15, 16] },
+  12: { x: 800, y: 600, connections: [9, 13, 14] },
+  13: { x: 800, y: 450, connections: [12] },
+  14: { x: 800, y: 300, connections: [11, 12, 15, 16] },
   15: { x: 650, y: 150, connections: [8, 11, 14, 16] },
   16: { x: 800, y: 150, connections: [14, 15] },
 
@@ -76,9 +76,8 @@ export const connections = [
   { from: 9, to: 10, types: [TICKET_TYPES.TAXI] },
   { from: 9, to: 12, types: [TICKET_TYPES.TAXI] },
 
-  // Station 10 (Taxi/Bus hub)
+  // Station 10 (Taxi hub)
   { from: 10, to: 11, types: [TICKET_TYPES.TAXI] },
-  { from: 10, to: 13, types: [TICKET_TYPES.BUS] },
   { from: 10, to: 18, types: [TICKET_TYPES.TAXI, TICKET_TYPES.BUS, TICKET_TYPES.UNDERGROUND] },
 
   // Station 11 (Taxi/Underground hub)
@@ -86,10 +85,11 @@ export const connections = [
   { from: 11, to: 15, types: [TICKET_TYPES.TAXI] },
 
   // Station 12 (Taxi/Bus hub)
-  { from: 12, to: 13, types: [TICKET_TYPES.TAXI, TICKET_TYPES.BUS] },
+  { from: 12, to: 13, types: [TICKET_TYPES.TAXI] },
+  { from: 12, to: 14, types: [TICKET_TYPES.BUS] },
 
-  // Station 13 (Bus only)
-  { from: 13, to: 14, types: [TICKET_TYPES.BUS] },
+  // Station 13 (Taxi only)
+  // No longer has bus connections
 
   // Station 14 (Major hub - Taxi/Bus/Underground)
   { from: 14, to: 15, types: [TICKET_TYPES.UNDERGROUND] },

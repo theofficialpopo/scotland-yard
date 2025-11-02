@@ -18,10 +18,10 @@ export const stations = {
 
   // EAST SIDE (Right bank - across the river)
   9: { x: 650, y: 600 },   // Taxi only
-  10: { x: 650, y: 450 },  // Taxi/Bus hub
+  10: { x: 650, y: 450 },  // Taxi hub
   11: { x: 650, y: 300 },  // Taxi/Underground hub
   12: { x: 800, y: 600 },  // Taxi/Bus hub
-  13: { x: 800, y: 450 },  // Bus only
+  13: { x: 800, y: 450 },  // Taxi only
   14: { x: 800, y: 300 },  // Taxi/Bus/Underground hub (major)
   15: { x: 650, y: 150 },  // Underground only
   16: { x: 800, y: 150 },  // Taxi only
@@ -74,9 +74,8 @@ export const connections = [
   { from: 9, to: 10, types: ['taxi'] },
   { from: 9, to: 12, types: ['taxi'] },
 
-  // Station 10 (Taxi/Bus hub)
+  // Station 10 (Taxi hub)
   { from: 10, to: 11, types: ['taxi'] },
-  { from: 10, to: 13, types: ['bus'] },
   { from: 10, to: 18, types: ['taxi', 'bus', 'underground'] },
 
   // Station 11 (Taxi/Underground hub)
@@ -84,10 +83,11 @@ export const connections = [
   { from: 11, to: 15, types: ['taxi'] },
 
   // Station 12 (Taxi/Bus hub)
-  { from: 12, to: 13, types: ['taxi', 'bus'] },
+  { from: 12, to: 13, types: ['taxi'] },
+  { from: 12, to: 14, types: ['bus'] },
 
-  // Station 13 (Bus only)
-  { from: 13, to: 14, types: ['bus'] },
+  // Station 13 (Taxi only)
+  // No longer has bus connections
 
   // Station 14 (Major hub - Taxi/Bus/Underground)
   { from: 14, to: 15, types: ['underground'] },
