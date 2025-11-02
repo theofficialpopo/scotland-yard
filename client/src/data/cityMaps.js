@@ -15,19 +15,19 @@ export const CITY_CONFIGS = {
     center: [-0.1278, 51.5074],
 
     // Southwest and Northeast corner bounds [longitude, latitude]
-    // This creates a bounded rectangular area for the game board
+    // Compact 1.5km x 1.5km area for optimal performance
     bounds: [
-      [-0.5103, 51.2867],  // Southwest corner (min lon, min lat)
-      [0.3340, 51.6918]    // Northeast corner (max lon, max lat)
+      [-0.1386, 51.5006],  // Southwest corner
+      [-0.1170, 51.5141]   // Northeast corner
     ],
 
     // Zoom levels
-    zoom: 12,        // Default zoom
-    minZoom: 11,     // Prevent zooming out too far
-    maxZoom: 14,     // Prevent zooming in too close
+    zoom: 14.5,      // Default zoom (closer for smaller area)
+    minZoom: 14,     // Prevent zooming out too far
+    maxZoom: 17,     // Allow closer zoom for detail
 
     // Visual settings
-    style: 'mapbox://styles/mapbox/navigation-night-v1',  // Dark with colorful roads for Scotland Yard feel
+    style: 'mapbox://styles/mapbox/streets-v12',  // Standard streets map
 
     // Game settings (future use)
     recommendedStations: 20,  // Suggested number of stations for this map size
@@ -41,16 +41,17 @@ export const CITY_CONFIGS = {
 
     center: [-74.0060, 40.7128],
 
+    // Compact 1.5km x 1.5km area (Midtown Manhattan)
     bounds: [
-      [-74.0479, 40.6829],  // Southwest
-      [-73.9372, 40.7834]   // Northeast
+      [-74.0149, 40.7060],  // Southwest
+      [-73.9971, 40.7195]   // Northeast
     ],
 
-    zoom: 12,
-    minZoom: 11,
-    maxZoom: 14,
+    zoom: 14.5,
+    minZoom: 14,
+    maxZoom: 17,
 
-    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    style: 'mapbox://styles/mapbox/streets-v12',
 
     recommendedStations: 22,
     area: 'manhattan'
@@ -63,16 +64,17 @@ export const CITY_CONFIGS = {
 
     center: [2.3522, 48.8566],
 
+    // Compact 1.5km x 1.5km area (Around Louvre)
     bounds: [
-      [2.2241, 48.8156],   // Southwest
-      [2.4699, 48.9022]    // Northeast
+      [2.3419, 48.8498],   // Southwest
+      [2.3625, 48.8633]    // Northeast
     ],
 
-    zoom: 12,
-    minZoom: 11,
-    maxZoom: 14,
+    zoom: 14.5,
+    minZoom: 14,
+    maxZoom: 17,
 
-    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    style: 'mapbox://styles/mapbox/streets-v12',
 
     recommendedStations: 20,
     area: 'central'
@@ -85,16 +87,17 @@ export const CITY_CONFIGS = {
 
     center: [13.4050, 52.5200],
 
+    // Compact 1.5km x 1.5km area (Brandenburg Gate area)
     bounds: [
-      [13.2288, 52.4329],  // Southwest
-      [13.5582, 52.6171]   // Northeast
+      [13.3939, 52.5132],  // Southwest
+      [13.4161, 52.5267]   // Northeast
     ],
 
-    zoom: 12,
-    minZoom: 11,
-    maxZoom: 14,
+    zoom: 14.5,
+    minZoom: 14,
+    maxZoom: 17,
 
-    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    style: 'mapbox://styles/mapbox/streets-v12',
 
     recommendedStations: 18,
     area: 'mitte'
@@ -107,16 +110,17 @@ export const CITY_CONFIGS = {
 
     center: [139.7690, 35.6762],
 
+    // Compact 1.5km x 1.5km area (Shibuya Station area)
     bounds: [
-      [139.6291, 35.6262],  // Southwest
-      [139.8089, 35.7262]   // Northeast
+      [139.7606, 35.6694],  // Southwest
+      [139.7774, 35.6829]   // Northeast
     ],
 
-    zoom: 12,
-    minZoom: 11,
-    maxZoom: 14,
+    zoom: 14.5,
+    minZoom: 14,
+    maxZoom: 17,
 
-    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    style: 'mapbox://styles/mapbox/streets-v12',
 
     recommendedStations: 24,
     area: 'central'
