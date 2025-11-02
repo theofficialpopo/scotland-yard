@@ -172,10 +172,10 @@ function Board({ room, playerId, emit }) {
       </div>
 
       <svg
-        viewBox="0 0 1100 900"
+        viewBox="100 0 800 750"
         style={{
           width: '100%',
-          maxWidth: '1100px',
+          maxWidth: '900px',
           height: 'auto',
           border: '4px solid #8B4513',
           borderRadius: '4px',
