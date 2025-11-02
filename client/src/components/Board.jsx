@@ -183,37 +183,69 @@ function Board({ room, playerId, emit }) {
           boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3), inset 0 0 20px rgba(139, 69, 19, 0.1)'
         }}
       >
-        {/* Render connections */}
+        {/* Render connections - one line per ticket type */}
         {connections.map((conn, i) => {
           const from = stations[conn.from];
           const to = stations[conn.to];
 
           if (!from || !to) return null;
 
-          // Authentic Scotland Yard colors
-          const color = conn.types[0] === 'taxi' ? '#FDB913' :
-                       conn.types[0] === 'bus' ? '#00A651' :
-                       conn.types[0] === 'underground' ? '#DC241F' :
-                       conn.types[0] === 'ferry' ? '#0098D4' :
-                       '#999';
+          // Calculate perpendicular offset for multiple lines
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
+          const length = Math.sqrt(dx * dx + dy * dy);
 
+          // Perpendicular unit vector
+          const perpX = -dy / length;
+          const perpY = dx / length;
+
+          // Spacing between parallel lines
+          const lineSpacing = 4;
+          const numLines = conn.types.length;
+
+          // Calculate starting offset (center the group of lines)
+          const startOffset = -(numLines - 1) * lineSpacing / 2;
+
+          // Render one line for each ticket type
           return (
-            <line
-              key={`conn-${i}`}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-              stroke={color}
-              strokeWidth="3.5"
-              strokeDasharray={conn.types[0] === 'underground' ? '8,4' : '0'}
-              strokeLinecap="round"
-              className="connection"
-              opacity="0.8"
-              style={{
-                filter: 'drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2))'
-              }}
-            />
+            <g key={`conn-group-${i}`}>
+              {conn.types.map((ticketType, typeIndex) => {
+                // Calculate offset for this line
+                const offset = startOffset + (typeIndex * lineSpacing);
+
+                // Offset start and end points perpendicular to the line
+                const x1 = from.x + perpX * offset;
+                const y1 = from.y + perpY * offset;
+                const x2 = to.x + perpX * offset;
+                const y2 = to.y + perpY * offset;
+
+                // Authentic Scotland Yard colors
+                const color = ticketType === 'taxi' ? '#FDB913' :
+                             ticketType === 'bus' ? '#00A651' :
+                             ticketType === 'underground' ? '#DC241F' :
+                             ticketType === 'ferry' ? '#0098D4' :
+                             '#999';
+
+                return (
+                  <line
+                    key={`conn-${i}-${ticketType}`}
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={color}
+                    strokeWidth="3.5"
+                    strokeDasharray={ticketType === 'underground' ? '8,4' : '0'}
+                    strokeLinecap="round"
+                    className="connection"
+                    opacity="0.8"
+                    style={{
+                      filter: 'drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2))'
+                    }}
+                  />
+                );
+              })}
+            </g>
           );
         })}
 
