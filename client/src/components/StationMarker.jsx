@@ -67,11 +67,10 @@ function StationMarker({
 
     if (isReachable) {
       return {
-        fill: '#FFF8DC',
+        fill: '#F5F5DC',
         stroke: '#333',
-        strokeWidth: 2.5,
-        filter: 'drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.25))',
-        animation: 'pulse'
+        strokeWidth: 2,
+        filter: 'drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.2))'
       };
     }
 
@@ -101,20 +100,6 @@ function StationMarker({
           </feMerge>
         </filter>
 
-        {/* Pulse animation for reachable stations */}
-        {isReachable && (
-          <style>
-            {`
-              @keyframes pulse-${stationId} {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-              }
-              .pulse-${stationId} {
-                animation: pulse-${stationId} 2s ease-in-out infinite;
-              }
-            `}
-          </style>
-        )}
       </defs>
 
       {/* Ticket type indicators */}
@@ -158,7 +143,6 @@ function StationMarker({
           cursor: isReachable ? 'pointer' : 'default',
           transition: 'all 0.2s ease'
         }}
-        className={isReachable ? `pulse-${stationId}` : ''}
         onClick={onClick}
       />
 
@@ -200,6 +184,19 @@ function StationMarker({
             repeatCount="indefinite"
           />
         </circle>
+      )}
+
+      {/* Subtle gray highlight ring for reachable stations */}
+      {isReachable && !isSelected && (
+        <circle
+          cx={x}
+          cy={y}
+          r={mainRadius + 3}
+          fill="none"
+          stroke="#888"
+          strokeWidth="2"
+          opacity="0.4"
+        />
       )}
     </g>
   );
