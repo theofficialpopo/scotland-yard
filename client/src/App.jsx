@@ -139,55 +139,158 @@ function App() {
   };
 
   return (
-    <div className="container">
-      <header style={{ textAlign: 'center', padding: '20px 0' }}>
-        <h1>🎮 Scotland Yard - Online Multiplayer</h1>
-        <p>
-          {connected ? (
-            <span style={{ color: 'green' }}>● Connected</span>
-          ) : (
-            <span style={{ color: 'red' }}>● Disconnected</span>
-          )}
-        </p>
-      </header>
-
+    <div style={{
+      minHeight: '100vh',
+      width: '100vw',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative'
+    }}>
+      {/* Error Toast - Show on top of everything */}
       {(error || socketError) && (
-        <div className="error">
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: 'rgba(220, 53, 69, 0.95)',
+          color: 'white',
+          padding: '15px 30px',
+          borderRadius: '8px',
+          border: '2px solid #8B4513',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          maxWidth: '500px',
+          textAlign: 'center'
+        }}>
           {error || socketError}
         </div>
       )}
 
+      {/* Lobby Screen */}
       {gameState === 'lobby' && (
-        <Lobby
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
-          connected={connected}
-        />
+        <div style={{
+          width: '100%',
+          maxWidth: '500px',
+          padding: '40px',
+          background: 'rgba(30, 25, 20, 0.95)',
+          border: '3px solid #8B4513',
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+          color: '#f5f5f5'
+        }}>
+          <h1 style={{ textAlign: 'center', marginTop: 0, marginBottom: '10px', fontSize: '32px' }}>
+            🎩 Scotland Yard
+          </h1>
+          <p style={{ textAlign: 'center', marginBottom: '30px', color: '#ccc' }}>
+            {connected ? (
+              <span style={{ color: '#4CAF50' }}>● Connected</span>
+            ) : (
+              <span style={{ color: '#f44336' }}>● Disconnected</span>
+            )}
+          </p>
+
+          <Lobby
+            onCreateRoom={handleCreateRoom}
+            onJoinRoom={handleJoinRoom}
+            connected={connected}
+          />
+        </div>
       )}
 
+      {/* Waiting Room */}
       {gameState === 'waiting' && room && (
-        <div className="card">
-          <h2>Game Lobby</h2>
-          <p><strong>Room Code:</strong> <code style={{ fontSize: '24px', padding: '5px 10px', background: '#f0f0f0' }}>{roomCode}</code></p>
-          <p>Share this code with friends to join!</p>
+        <div style={{
+          width: '100%',
+          maxWidth: '600px',
+          padding: '40px',
+          background: 'rgba(30, 25, 20, 0.95)',
+          border: '3px solid #8B4513',
+          borderRadius: '12px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+          color: '#f5f5f5'
+        }}>
+          <h2 style={{ marginTop: 0, borderBottom: '2px solid #8B4513', paddingBottom: '15px' }}>
+            🎮 Game Lobby
+          </h2>
 
-          <h3>Players ({room.players.length}/{room.maxPlayers})</h3>
-          <ul>
-            {room.players.map((player, i) => (
-              <li key={player.id}>
-                {player.name}
-                {player.id === room.host && ' (Host)'}
-                {player.id === playerId && ' (You)'}
-              </li>
+          <div style={{
+            background: 'rgba(50, 45, 40, 0.6)',
+            padding: '20px',
+            borderRadius: '8px',
+            marginBottom: '25px',
+            textAlign: 'center'
+          }}>
+            <p style={{ margin: '0 0 10px 0', color: '#ccc' }}>Room Code:</p>
+            <code style={{
+              fontSize: '36px',
+              fontWeight: 'bold',
+              padding: '10px 20px',
+              background: 'rgba(255, 215, 0, 0.2)',
+              border: '2px solid #FFD700',
+              borderRadius: '8px',
+              color: '#FFD700',
+              letterSpacing: '4px'
+            }}>
+              {roomCode}
+            </code>
+            <p style={{ margin: '15px 0 0 0', fontSize: '14px', color: '#999' }}>
+              Share this code with friends to join!
+            </p>
+          </div>
+
+          <h3 style={{ borderBottom: '2px solid #8B4513', paddingBottom: '10px' }}>
+            Players ({room.players.length}/{room.maxPlayers})
+          </h3>
+          <div style={{ marginBottom: '25px' }}>
+            {room.players.map((player) => (
+              <div
+                key={player.id}
+                style={{
+                  background: 'rgba(50, 45, 40, 0.6)',
+                  border: `2px solid ${player.id === playerId ? '#FFD700' : '#8B4513'}`,
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '10px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <span style={{ fontWeight: 'bold' }}>{player.name}</span>
+                <span style={{ fontSize: '12px', color: '#ccc' }}>
+                  {player.id === room.host && '👑 Host'}
+                  {player.id === playerId && ' (You)'}
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
 
-          <div style={{ marginTop: '20px' }}>
+          {room.players.length < 2 && (
+            <p style={{
+              textAlign: 'center',
+              color: '#999',
+              fontStyle: 'italic',
+              marginBottom: '20px'
+            }}>
+              Waiting for at least 1 more player...
+            </p>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px' }}>
             {room.host === playerId && (
               <button
                 className="button"
                 onClick={handleStartGame}
                 disabled={room.players.length < 2}
+                style={{
+                  flex: 1,
+                  background: room.players.length >= 2 ? '#4CAF50' : '#ccc',
+                  fontSize: '16px',
+                  padding: '12px'
+                }}
               >
                 Start Game
               </button>
@@ -195,17 +298,16 @@ function App() {
             <button
               className="button"
               onClick={handleLeaveRoom}
-              style={{ marginLeft: '10px', background: '#dc3545' }}
+              style={{
+                flex: room.host === playerId ? '0 0 auto' : 1,
+                background: '#dc3545',
+                fontSize: '16px',
+                padding: '12px'
+              }}
             >
               Leave Room
             </button>
           </div>
-
-          {room.players.length < 2 && (
-            <p style={{ color: '#666', marginTop: '10px' }}>
-              Waiting for at least 1 more player...
-            </p>
-          )}
         </div>
       )}
 
