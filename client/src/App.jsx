@@ -62,8 +62,9 @@ function App() {
     const unsubError = on('error', ({ message, code }) => {
       console.error('Server error:', code, message);
       setError(message);
-      // Auto-clear error after 5 seconds
-      setTimeout(() => setError(null), 5000);
+      // Auto-clear error based on message length (min 3s, max 10s, ~100ms per character)
+      const timeout = Math.min(Math.max(message.length * 100, 3000), 10000);
+      setTimeout(() => setError(null), timeout);
     });
 
     return () => {

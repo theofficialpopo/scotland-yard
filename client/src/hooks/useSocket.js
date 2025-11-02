@@ -3,6 +3,14 @@ import { io } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
+// Warn if VITE_SOCKET_URL is not set in production
+if (import.meta.env.MODE === 'production' && !import.meta.env.VITE_SOCKET_URL) {
+  console.warn(
+    '⚠️ VITE_SOCKET_URL is not set in production! Falling back to localhost:3001 which will not work in production. ' +
+    'Please set VITE_SOCKET_URL in your .env file.'
+  );
+}
+
 export function useSocket() {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);

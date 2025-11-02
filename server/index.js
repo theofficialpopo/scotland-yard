@@ -33,7 +33,8 @@ const io = new Server(server, {
     credentials: true
   },
   pingTimeout: 60000,
-  pingInterval: 25000
+  pingInterval: 25000,
+  maxHttpBufferSize: 1e6 // 1MB limit to prevent large payload attacks
 });
 
 // Middleware
@@ -60,8 +61,18 @@ app.get('/health', (req, res) => {
 // Active games storage (in-memory for MVP)
 const activeGames = new Map();
 const activePlayers = new Map();
+
+// Configuration constants
 const MAX_CONCURRENT_GAMES = 100; // Prevent memory exhaustion
-const GAME_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const TIMEOUTS = {
+  GAME_TTL: 2 * 60 * 60 * 1000,           // 2 hours - max game lifetime
+  INACTIVE_DISCONNECT: 10 * 60 * 1000,    // 10 minutes - cleanup if all players disconnected
+  WAITING_TIMEOUT: 30 * 60 * 1000,        // 30 minutes - cleanup games in waiting status
+  RATE_LIMIT_MAX_AGE: 60 * 60 * 1000,     // 1 hour - cleanup old rate limit entries
+  CLEANUP_INTERVAL: 5 * 60 * 1000         // 5 minutes - how often cleanup runs
+};
+// Legacy constant for backwards compatibility
+const GAME_TTL = TIMEOUTS.GAME_TTL;
 
 // Input validation functions
 function validatePlayerName(name) {
@@ -141,8 +152,8 @@ function getFilteredRoomForPlayer(room, playerId) {
     return room;
   }
 
-  // Clone the room to avoid modifying original
-  const filteredRoom = JSON.parse(JSON.stringify(room));
+  // Clone the room to avoid modifying original (uses structuredClone for better performance)
+  const filteredRoom = structuredClone(room);
 
   // Check if current round is a reveal round
   const isRevealRound = room.gameState.revealRounds.includes(room.gameState.currentRound);
@@ -166,12 +177,12 @@ function cleanupGames() {
 
     // Delete if:
     // 1. Older than TTL
-    // 2. All players disconnected for > 10 minutes
-    // 3. Game in WAITING status for > 30 minutes
+    // 2. All players disconnected for > configured timeout
+    // 3. Game in WAITING status for > configured timeout
     if (
-      age > GAME_TTL ||
-      (room.players.every(p => !p.connected) && inactive > 10 * 60 * 1000) ||
-      (room.status === 'WAITING' && age > 30 * 60 * 1000)
+      age > TIMEOUTS.GAME_TTL ||
+      (room.players.every(p => !p.connected) && inactive > TIMEOUTS.INACTIVE_DISCONNECT) ||
+      (room.status === 'WAITING' && age > TIMEOUTS.WAITING_TIMEOUT)
     ) {
       activeGames.delete(roomCode);
       cleaned++;
@@ -186,12 +197,11 @@ function cleanupGames() {
 // Clean up old rate limit entries to prevent memory leak
 function cleanupRateLimits() {
   const now = Date.now();
-  const maxAge = 60 * 60 * 1000; // 1 hour
   let cleaned = 0;
 
   for (const [key, timestamps] of rateLimits.entries()) {
-    // Remove entries where all timestamps are older than 1 hour
-    const hasRecentActivity = timestamps.some(t => now - t < maxAge);
+    // Remove entries where all timestamps are older than the configured max age
+    const hasRecentActivity = timestamps.some(t => now - t < TIMEOUTS.RATE_LIMIT_MAX_AGE);
 
     if (!hasRecentActivity) {
       rateLimits.delete(key);
@@ -204,9 +214,9 @@ function cleanupRateLimits() {
   }
 }
 
-// Run cleanup every 5 minutes
-setInterval(cleanupGames, 5 * 60 * 1000);
-setInterval(cleanupRateLimits, 5 * 60 * 1000);
+// Run cleanup at configured interval
+setInterval(cleanupGames, TIMEOUTS.CLEANUP_INTERVAL);
+setInterval(cleanupRateLimits, TIMEOUTS.CLEANUP_INTERVAL);
 
 // Socket.IO connection handling with error handling wrapper
 io.on('connection', (socket) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { stations, connections } from '../data/londonMap';
 
 function Board({ room, playerId, emit }) {
@@ -16,9 +16,54 @@ function Board({ room, playerId, emit }) {
   const isMyTurn = currentPlayer?.id === playerId;
   const myPlayer = room.players.find(p => p.id === playerId);
 
+  // Get current player's position
+  const currentPosition = useMemo(() => {
+    if (!myPlayer || !isMyTurn) return null;
+    return myPlayer.role === 'mrX'
+      ? room.gameState.mrX.position
+      : room.gameState.detectives[myPlayer.detectiveIndex]?.position;
+  }, [myPlayer, isMyTurn, room.gameState]);
+
+  // Helper function to check if two stations are connected by a specific ticket type
+  const areStationsConnected = (from, to, ticketType) => {
+    return connections.some(conn =>
+      (conn.from === from && conn.to === to && conn.types.includes(ticketType)) ||
+      (conn.to === from && conn.from === to && conn.types.includes(ticketType))
+    );
+  };
+
+  // Get valid ticket types for a connection
+  const getValidTicketTypes = (from, to) => {
+    const validTypes = new Set();
+    connections.forEach(conn => {
+      if ((conn.from === from && conn.to === to) || (conn.to === from && conn.from === to)) {
+        conn.types.forEach(type => validTypes.add(type));
+      }
+    });
+    return Array.from(validTypes);
+  };
+
+  // Get reachable stations from current position
+  const reachableStations = useMemo(() => {
+    if (!currentPosition || !isMyTurn) return new Set();
+
+    const reachable = new Set();
+    connections.forEach(conn => {
+      if (conn.from === currentPosition) reachable.add(conn.to);
+      if (conn.to === currentPosition) reachable.add(conn.from);
+    });
+    return reachable;
+  }, [currentPosition, isMyTurn]);
+
   const handleStationClick = (stationId) => {
     if (!isMyTurn) {
       console.log('Not your turn');
+      return;
+    }
+
+    // Only allow selecting reachable stations
+    if (!reachableStations.has(stationId)) {
+      console.log('Station not reachable from current position');
       return;
     }
 
@@ -27,15 +72,11 @@ function Board({ room, playerId, emit }) {
   };
 
   const handleMove = (ticketType) => {
-    if (!selectedStation || !isMyTurn) return;
+    if (!selectedStation || !isMyTurn || !currentPosition) return;
 
-    // Get current player's position using detectiveIndex
-    const currentPosition = myPlayer.role === 'mrX'
-      ? room.gameState.mrX.position
-      : room.gameState.detectives[myPlayer.detectiveIndex]?.position;
-
-    if (!currentPosition) {
-      console.log('No current position set');
+    // Validate that the move is legal with this ticket type
+    if (!areStationsConnected(currentPosition, selectedStation, ticketType)) {
+      console.error('Invalid move: stations not connected by this ticket type');
       return;
     }
 
@@ -97,19 +138,23 @@ function Board({ room, playerId, emit }) {
 
         {/* Render stations */}
         {Object.entries(stations).map(([id, station]) => {
-          const isSelected = parseInt(id) === selectedStation;
+          const stationId = parseInt(id);
+          const isSelected = stationId === selectedStation;
+          const isReachable = isMyTurn && reachableStations.has(stationId);
+          const isCurrent = stationId === currentPosition;
 
           return (
             <g key={`station-${id}`}>
               <circle
                 cx={station.x}
                 cy={station.y}
-                r={isSelected ? 10 : 6}
-                fill={isSelected ? '#007bff' : '#fff'}
+                r={isSelected ? 10 : isCurrent ? 8 : 6}
+                fill={isSelected ? '#007bff' : isCurrent ? '#28a745' : isReachable ? '#ffc107' : '#fff'}
                 stroke="#333"
-                strokeWidth={isSelected ? 3 : 1}
+                strokeWidth={isSelected ? 3 : isCurrent ? 2 : 1}
                 className="station"
-                onClick={() => handleStationClick(parseInt(id))}
+                onClick={() => handleStationClick(stationId)}
+                style={{ cursor: isReachable ? 'pointer' : 'default', opacity: isReachable || !isMyTurn ? 1 : 0.5 }}
               />
               <text
                 x={station.x}
@@ -170,37 +215,56 @@ function Board({ room, playerId, emit }) {
         })}
       </svg>
 
-      {selectedStation && isMyTurn && (
+      {selectedStation && isMyTurn && currentPosition && (
         <div style={{ marginTop: '15px' }}>
           <p><strong>Selected Station:</strong> {selectedStation}</p>
           <p>Choose a ticket type:</p>
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-            <button
-              className="button ticket-taxi"
-              onClick={() => handleMove('taxi')}
-            >
-              Taxi
-            </button>
-            <button
-              className="button ticket-bus"
-              onClick={() => handleMove('bus')}
-            >
-              Bus
-            </button>
-            <button
-              className="button ticket-underground"
-              onClick={() => handleMove('underground')}
-            >
-              Underground
-            </button>
-            {myPlayer?.role === 'mrX' && (
-              <button
-                className="button ticket-black"
-                onClick={() => handleMove('black')}
-              >
-                Black
-              </button>
-            )}
+            {(() => {
+              const validTickets = getValidTicketTypes(currentPosition, selectedStation);
+              const currentTickets = myPlayer?.role === 'mrX'
+                ? room.gameState.mrX.tickets
+                : room.gameState.detectives[myPlayer.detectiveIndex]?.tickets;
+
+              return (
+                <>
+                  <button
+                    className="button ticket-taxi"
+                    onClick={() => handleMove('taxi')}
+                    disabled={!validTickets.includes('taxi') || !currentTickets?.taxi}
+                    style={{ opacity: validTickets.includes('taxi') && currentTickets?.taxi ? 1 : 0.5 }}
+                  >
+                    Taxi ({currentTickets?.taxi || 0})
+                  </button>
+                  <button
+                    className="button ticket-bus"
+                    onClick={() => handleMove('bus')}
+                    disabled={!validTickets.includes('bus') || !currentTickets?.bus}
+                    style={{ opacity: validTickets.includes('bus') && currentTickets?.bus ? 1 : 0.5 }}
+                  >
+                    Bus ({currentTickets?.bus || 0})
+                  </button>
+                  <button
+                    className="button ticket-underground"
+                    onClick={() => handleMove('underground')}
+                    disabled={!validTickets.includes('underground') || !currentTickets?.underground}
+                    style={{ opacity: validTickets.includes('underground') && currentTickets?.underground ? 1 : 0.5 }}
+                  >
+                    Underground ({currentTickets?.underground || 0})
+                  </button>
+                  {myPlayer?.role === 'mrX' && (
+                    <button
+                      className="button ticket-black"
+                      onClick={() => handleMove('black')}
+                      disabled={!currentTickets?.black}
+                      style={{ opacity: currentTickets?.black ? 1 : 0.5 }}
+                    >
+                      Black ({currentTickets?.black || 0})
+                    </button>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <button
             className="button"
