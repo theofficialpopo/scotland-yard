@@ -46,13 +46,14 @@ export const DETECTIVE_STARTING_TICKETS = {
 // Mr. X gets 2 double-move cards
 export const MR_X_DOUBLE_MOVES = 2;
 
-// Starting station IDs (18 possible starting positions)
+// Starting station IDs for simplified test map
+// Spread across both sides of the map for strategic gameplay
 export const STARTING_STATIONS = [
-  13, 26, 29, 34, 50, 53, 91, 94, 103, 112, 117, 132, 138, 141, 155, 174, 197, 198
+  1, 2, 4, 7, 9, 10, 12, 14, 16  // Various stations on both banks
 ];
 
 // Thames ferry stations (Mr. X only, requires black ticket)
-export const FERRY_STATIONS = [108, 115, 157, 194];
+export const FERRY_STATIONS = [17, 18];
 
 // Color codes for UI
 export const TICKET_COLORS = {
