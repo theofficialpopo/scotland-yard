@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSocket } from './hooks/useSocket';
 import Lobby from './components/Lobby';
 import Board from './components/Board';
+import GameEndScreen from './components/GameEndScreen';
 
 function App() {
   const { socket, connected, error: socketError, emit, on } = useSocket();
@@ -11,6 +12,7 @@ function App() {
   const [room, setRoom] = useState(null);
   const [playerId, setPlayerId] = useState(null);
   const [error, setError] = useState(null);
+  const [gameEndData, setGameEndData] = useState(null);
 
   // Track all unsubscribe functions to prevent memory leaks
   const cleanupFunctions = useRef([]);
@@ -63,9 +65,9 @@ function App() {
     cleanupFunctions.current.push(unsubGameStateUpdated);
 
     // Listen for game over
-    const unsubGameOver = on('game:over', ({ winner, reason }) => {
+    const unsubGameOver = on('game:over', ({ winner, reason, moveHistory, finalRound }) => {
       console.log('Game over:', winner, reason);
-      alert(`Game Over! ${winner === 'detectives' ? 'Detectives' : 'Mister X'} won! ${reason}`);
+      setGameEndData({ winner, reason, moveHistory, finalRound });
       // Room state will be updated via game:state:updated
     });
     cleanupFunctions.current.push(unsubGameOver);
@@ -413,6 +415,20 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Game End Screen - Shows as overlay when game ends */}
+      {gameEndData && (
+        <GameEndScreen
+          winner={gameEndData.winner}
+          reason={gameEndData.reason}
+          moveHistory={gameEndData.moveHistory}
+          finalRound={gameEndData.finalRound}
+          onReturnToLobby={() => {
+            setGameEndData(null);
+            handleLeaveRoom();
+          }}
+        />
       )}
     </div>
   );

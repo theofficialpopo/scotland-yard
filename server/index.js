@@ -770,7 +770,8 @@ io.on('connection', (socket) => {
         tickets: { taxi: 10, bus: 8, underground: 4 }
       })),
       winner: null,
-      winReason: null
+      winReason: null,
+      moveHistory: [] // Track all moves for game end screen
     };
 
     // Assign starting positions
@@ -862,6 +863,17 @@ io.on('connection', (socket) => {
         revealed: room.gameState.revealRounds.includes(room.gameState.currentRound)
       });
 
+      // Add to global move history
+      room.gameState.moveHistory.push({
+        round: room.gameState.currentRound,
+        playerName: currentPlayer.name,
+        playerRole: 'mrX',
+        from,
+        to,
+        ticketType,
+        timestamp: Date.now()
+      });
+
       // Handle double-move card
       if (useDoubleMove && !room.gameState.doubleMoveInProgress) {
         // Start double-move: Mr. X gets another turn immediately
@@ -886,6 +898,18 @@ io.on('connection', (socket) => {
       // Transfer ticket to Mr. X
       room.gameState.mrX.tickets[ticketType]++;
 
+      // Add to global move history
+      room.gameState.moveHistory.push({
+        round: room.gameState.currentRound,
+        playerName: currentPlayer.name,
+        playerRole: 'detective',
+        detectiveIndex,
+        from,
+        to,
+        ticketType,
+        timestamp: Date.now()
+      });
+
       // Advance turn
       room.gameState.currentPlayerIndex++;
     }
@@ -908,7 +932,9 @@ io.on('connection', (socket) => {
 
       io.to(roomCode).emit('game:over', {
         winner: winCondition.winner,
-        reason: winCondition.reason
+        reason: winCondition.reason,
+        moveHistory: room.gameState.moveHistory,
+        finalRound: room.gameState.currentRound
       });
     }
 
