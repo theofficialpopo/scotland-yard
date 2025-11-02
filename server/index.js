@@ -1235,6 +1235,54 @@ io.on('connection', (socket) => {
     console.log(`${currentPlayer.name} moved from ${from} to ${to} using ${ticketType}`);
   }));
 
+  // Handle admin data fetch
+  socket.on('admin:fetch', safeHandler(() => {
+    // Simple authentication check - admin access requires environment variable
+    const adminKey = process.env.ADMIN_KEY;
+
+    // If no admin key is set, allow access in development only
+    if (adminKey && adminKey !== '' && process.env.NODE_ENV !== 'development') {
+      // In production with admin key set, require authentication
+      // For now, we'll emit error. TODO: implement password prompt in client
+      socket.emit('admin:error', {
+        message: 'Admin access is protected. Authentication required.'
+      });
+      return;
+    }
+
+    // Collect room data
+    const roomsData = Array.from(activeGames.values()).map(room => ({
+      code: room.code,
+      status: room.status,
+      players: room.players.map(p => ({
+        name: p.name,
+        role: p.role,
+        connected: p.connected
+      })),
+      maxPlayers: room.maxPlayers,
+      hostName: room.players.find(p => p.id === room.host)?.name || 'Unknown',
+      createdAt: room.createdAt,
+      startedAt: room.startedAt,
+      currentRound: room.gameState?.currentRound,
+      moveHistory: room.gameState?.moveHistory || []
+    }));
+
+    // Calculate statistics
+    const stats = {
+      activeRooms: activeGames.size,
+      totalPlayers: activePlayers.size,
+      gamesPlaying: roomsData.filter(r => r.status === 'PLAYING').length,
+      gamesWaiting: roomsData.filter(r => r.status === 'WAITING').length
+    };
+
+    socket.emit('admin:data', {
+      rooms: roomsData,
+      stats
+    });
+
+    console.log(`[Admin] Data sent to client ${socket.id}`);
+  }));
+
   // Handle disconnection
   socket.on('disconnect', (reason) => {
     console.log(`[${new Date().toISOString()}] Client disconnected: ${socket.id} (${reason})`);

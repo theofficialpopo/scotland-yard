@@ -3,6 +3,7 @@ import { useSocket } from './hooks/useSocket';
 import Lobby from './components/Lobby';
 import Board from './components/Board';
 import GameEndScreen from './components/GameEndScreen';
+import AdminPanel from './components/AdminPanel';
 
 function App() {
   const { socket, connected, error: socketError, emit, on } = useSocket();
@@ -272,6 +273,14 @@ function App() {
       emit('game:rematch', { roomCode });
     }
   };
+
+  // Check if we're on the admin route
+  const isAdminRoute = window.location.pathname === '/admin';
+
+  // Render admin panel if on /admin route
+  if (isAdminRoute) {
+    return <AdminPanel socket={socket} connected={connected} />;
+  }
 
   return (
     <div style={{
