@@ -4,6 +4,7 @@ import Lobby from './components/Lobby';
 import Board from './components/Board';
 import GameEndScreen from './components/GameEndScreen';
 import AdminPanel from './components/AdminPanel';
+import SettingsModal from './components/SettingsModal';
 
 function App() {
   const { socket, connected, error: socketError, emit, on } = useSocket();
@@ -15,6 +16,7 @@ function App() {
   const [error, setError] = useState(null);
   const [gameEndData, setGameEndData] = useState(null);
   const [selectedMrX, setSelectedMrX] = useState(null); // null = random, or player ID
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Track all unsubscribe functions to prevent memory leaks
   const cleanupFunctions = useRef([]);
@@ -540,11 +542,31 @@ function App() {
             </div>
             <div>
               <button
-                className="button"
-                onClick={handleLeaveRoom}
-                style={{ background: '#dc3545', padding: '8px 16px' }}
+                onClick={() => setSettingsOpen(true)}
+                style={{
+                  background: 'rgba(50, 45, 40, 0.8)',
+                  border: '2px solid #8B4513',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  color: '#FFD700',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(70, 60, 50, 0.9)';
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(50, 45, 40, 0.8)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                title="Settings"
               >
-                Leave Game
+                ⚙️
               </button>
             </div>
           </div>
@@ -631,6 +653,13 @@ function App() {
           }}
         />
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onLeaveGame={handleLeaveRoom}
+      />
     </div>
   );
 }
