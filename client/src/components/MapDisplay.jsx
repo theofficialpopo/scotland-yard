@@ -39,8 +39,29 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
   // Handle map load
   const handleLoad = useCallback(() => {
     setMapLoaded(true);
-    if (onMapLoad && mapRef.current) {
-      onMapLoad(mapRef.current.getMap());
+
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    // Hide unnecessary POI labels (hotels, restaurants, etc.)
+    const layersToHide = [
+      'poi-label',           // Points of interest (hotels, restaurants, shops)
+      'transit-label',       // Transit labels (we'll add our own custom stations)
+      'airport-label',       // Airport labels
+      'natural-label',       // Natural features
+      'waterway-label',      // Rivers, streams
+      'place-neighborhood',  // Neighborhood names
+      'settlement-subdivision-label' // Subdivision labels
+    ];
+
+    layersToHide.forEach(layerId => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', 'none');
+      }
+    });
+
+    if (onMapLoad) {
+      onMapLoad(map);
     }
   }, [onMapLoad]);
 
