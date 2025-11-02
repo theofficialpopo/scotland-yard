@@ -9,7 +9,8 @@ import { getCityConfig } from '../data/cityMaps';
  * Features:
  * - Bounded viewport that stays within city limits
  * - Prevents zooming out too far or in too close
- * - Dark theme for Scotland Yard feel
+ * - Zoom-based POI visibility (restaurants, hotels appear only when zoomed in)
+ * - Road filtering (minor roads hidden at lower zoom for cleaner game board)
  * - Navigation controls for user interaction
  *
  * Props:
@@ -43,20 +44,52 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
     const map = mapRef.current?.getMap();
     if (!map) return;
 
-    // Hide unnecessary POI labels (hotels, restaurants, etc.)
-    const layersToHide = [
-      'poi-label',           // Points of interest (hotels, restaurants, shops)
-      'transit-label',       // Transit labels (we'll add our own custom stations)
-      'airport-label',       // Airport labels
-      'natural-label',       // Natural features
-      'waterway-label',      // Rivers, streams
-      'place-neighborhood',  // Neighborhood names
-      'settlement-subdivision-label' // Subdivision labels
+    // Configure zoom-based POI visibility
+    // POIs appear only when zoomed in for detailed investigation
+    const poiLayersWithMinZoom = [
+      { id: 'poi-label', minZoom: 15 },              // Shops, restaurants, etc. - only at close zoom
+      { id: 'airport-label', minZoom: 14 },          // Airports - medium zoom
+      { id: 'natural-label', minZoom: 15 },          // Parks, natural features
+      { id: 'waterway-label', minZoom: 15 },         // Rivers, streams
+      { id: 'place-neighborhood', minZoom: 14.5 },   // Neighborhood names
+      { id: 'settlement-subdivision-label', minZoom: 15 } // Subdivisions
     ];
 
-    layersToHide.forEach(layerId => {
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, 'visibility', 'none');
+    poiLayersWithMinZoom.forEach(({ id, minZoom }) => {
+      const layer = map.getLayer(id);
+      if (layer) {
+        // Set the layer's minzoom property to control visibility
+        map.setLayerZoomRange(id, minZoom, 22);
+      }
+    });
+
+    // Keep transit labels hidden - we'll add our own custom stations
+    if (map.getLayer('transit-label')) {
+      map.setLayoutProperty('transit-label', 'visibility', 'none');
+    }
+
+    // Filter roads to show only major roads at lower zoom levels
+    // This reduces visual clutter for game board view
+    const roadLayers = [
+      'road-simple',
+      'road-street',
+      'road-secondary-tertiary',
+      'road-primary',
+      'road-motorway-trunk'
+    ];
+
+    roadLayers.forEach(layerId => {
+      const layer = map.getLayer(layerId);
+      if (layer) {
+        // Show minor roads (residential, service) only at zoom 14+
+        if (layerId === 'road-street') {
+          map.setLayerZoomRange(layerId, 14, 22);
+        }
+        // Show secondary/tertiary roads at zoom 13+
+        else if (layerId === 'road-secondary-tertiary') {
+          map.setLayerZoomRange(layerId, 13, 22);
+        }
+        // Major roads (primary, motorway, trunk) visible at all zooms
       }
     });
 
