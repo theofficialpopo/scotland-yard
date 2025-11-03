@@ -132,6 +132,40 @@ function MapTest() {
     console.log('Map loaded successfully');
   };
 
+  /**
+   * Get marker style based on station types
+   * Underground (red), Bus (green), Taxi-only (yellow)
+   */
+  const getStationStyle = (station) => {
+    const types = station.types || ['taxi'];
+
+    if (types.includes('underground')) {
+      return {
+        backgroundColor: '#FF0000',  // Red
+        size: 14,
+        icon: '🚇',
+        border: '3px solid #CC0000',
+        zIndex: 30
+      };
+    } else if (types.includes('bus')) {
+      return {
+        backgroundColor: '#00CC00',  // Green
+        size: 11,
+        icon: '🚌',
+        border: '2px solid #009900',
+        zIndex: 20
+      };
+    } else {
+      return {
+        backgroundColor: '#FFD700',  // Yellow/Gold
+        size: 9,
+        icon: '🚕',
+        border: '2px solid #CCAA00',
+        zIndex: 10
+      };
+    }
+  };
+
   // Address input view
   if (!showMap || !locationData) {
     return (
@@ -207,40 +241,51 @@ function MapTest() {
         generatedCenter={locationData.center}
       >
         {/* Station Markers (only if game board exists) */}
-        {gameBoard && gameBoard.stations.map((station) => (
-          <Marker
-            key={station.id}
-            longitude={station.coordinates[0]}
-            latitude={station.coordinates[1]}
-          >
-            <div style={{
-              background: '#FFD700',
-              border: '3px solid #8B4513',
-              borderRadius: '50%',
-              width: '24px',
-              height: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: '#1e1914',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              transition: 'transform 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            title={station.name}
-          >
-            {station.id}
-          </div>
-          </Marker>
-        ))}
+        {gameBoard && gameBoard.stations.map((station) => {
+          const style = getStationStyle(station);
+          return (
+            <Marker
+              key={station.id}
+              longitude={station.coordinates[0]}
+              latitude={station.coordinates[1]}
+            >
+              <div style={{
+                background: style.backgroundColor,
+                border: style.border,
+                borderRadius: '50%',
+                width: `${style.size * 2.5}px`,
+                height: `${style.size * 2.5}px`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: `${style.size}px`,
+                fontWeight: 'bold',
+                color: '#FFFFFF',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                zIndex: style.zIndex,
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.4)';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.7)';
+                e.currentTarget.style.zIndex = '100';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)';
+                e.currentTarget.style.zIndex = style.zIndex;
+              }}
+              title={`Station ${station.id}: ${station.name}\nTypes: ${station.types.join(', ').toUpperCase()}`}
+            >
+              <span style={{ fontSize: `${Math.max(style.size - 3, 8)}px`, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                {station.id}
+              </span>
+            </div>
+            </Marker>
+          );
+        })}
       </MapDisplay>
 
       {/* Top Control Buttons */}
@@ -370,17 +415,28 @@ function MapTest() {
             fontSize: '14px',
             color: '#ccc',
             display: 'flex',
-            gap: '20px',
-            flexWrap: 'wrap'
+            gap: '15px',
+            flexWrap: 'wrap',
+            justifyContent: 'center'
           }}>
-            <span>
-              <strong style={{ color: '#FFD700' }}>{gameBoard.stations.length}</strong> stations
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '16px' }}>🚇</span>
+              <strong style={{ color: '#FF0000' }}>{gameBoard.metadata.undergroundStations}</strong>
+              <span style={{ fontSize: '12px' }}>underground</span>
             </span>
-            <span>
-              <strong style={{ color: '#FFD700' }}>{gameBoard.metadata.snappedStations}</strong> snapped to roads
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '16px' }}>🚌</span>
+              <strong style={{ color: '#00CC00' }}>{gameBoard.metadata.busStations}</strong>
+              <span style={{ fontSize: '12px' }}>bus</span>
             </span>
-            <span>
-              Template: <strong style={{ color: '#FFD700' }}>Classic Scotland Yard</strong>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '16px' }}>🚕</span>
+              <strong style={{ color: '#FFD700' }}>{gameBoard.metadata.taxiOnlyStations}</strong>
+              <span style={{ fontSize: '12px' }}>taxi</span>
+            </span>
+            <span style={{ borderLeft: '1px solid #666', paddingLeft: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <strong style={{ color: '#87CEEB' }}>{gameBoard.metadata.realTransitStations}</strong>
+              <span style={{ fontSize: '12px' }}>real transit</span>
             </span>
           </div>
         </div>
@@ -416,33 +472,57 @@ function MapTest() {
             flexDirection: 'column',
             gap: '8px'
           }}>
-            {gameBoard.stations.map((station) => (
-              <div
-                key={station.id}
-                style={{
-                  padding: '8px 10px',
-                  background: 'rgba(255, 215, 0, 0.1)',
-                  border: '1px solid rgba(255, 215, 0, 0.3)',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  color: '#f5f5f5'
-                }}
-              >
-                <div style={{
-                  fontWeight: 'bold',
-                  color: '#FFD700',
-                  marginBottom: '4px'
-                }}>
-                  #{station.id}
+            {gameBoard.stations.map((station) => {
+              const style = getStationStyle(station);
+              return (
+                <div
+                  key={station.id}
+                  style={{
+                    padding: '8px 10px',
+                    background: `${style.backgroundColor}15`,
+                    border: `2px solid ${style.backgroundColor}`,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    color: '#f5f5f5',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = `${style.backgroundColor}30`;
+                    e.currentTarget.style.transform = 'translateX(5px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = `${style.backgroundColor}15`;
+                    e.currentTarget.style.transform = 'translateX(0)';
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px'
+                  }}>
+                    <span style={{ fontSize: '16px' }}>{style.icon}</span>
+                    <span style={{
+                      fontWeight: 'bold',
+                      color: style.backgroundColor
+                    }}>
+                      #{station.id}
+                    </span>
+                    {station.realTransit && (
+                      <span style={{ fontSize: '10px', color: '#87CEEB' }}>✓</span>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#ccc',
+                    paddingLeft: '24px'
+                  }}>
+                    {station.name}
+                  </div>
                 </div>
-                <div style={{
-                  fontSize: '11px',
-                  color: '#ccc'
-                }}>
-                  {station.name}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
