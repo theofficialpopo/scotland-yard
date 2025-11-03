@@ -90,13 +90,13 @@ function closestPointOnLine(point, lineCoordinates) {
  */
 export async function snapToRoad(lng, lat, radiusMeters = 100) {
   if (!MAPBOX_TOKEN || MAPBOX_TOKEN === 'your_mapbox_token_here') {
+    console.error('Mapbox token not configured');
     throw new Error('Mapbox token not configured');
   }
 
-  // Convert radius to approximate degrees (rough approximation)
-  const radiusDegrees = radiusMeters / 111000; // 1 degree ≈ 111km
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?radius=${radiusMeters}&limit=50&layers=road&access_token=${MAPBOX_TOKEN}`;
 
-  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?radius=${radiusDegrees * 111000}&limit=50&layers=road&access_token=${MAPBOX_TOKEN}`;
+  console.log(`🔍 Snapping [${lng.toFixed(6)}, ${lat.toFixed(6)}] to road within ${radiusMeters}m`);
 
   try {
     const response = await fetch(url);
@@ -107,8 +107,10 @@ export async function snapToRoad(lng, lat, radiusMeters = 100) {
 
     const data = await response.json();
 
+    console.log(`  Found ${data.features?.length || 0} total features from Tilequery API`);
+
     if (!data.features || data.features.length === 0) {
-      console.warn(`No roads found within ${radiusMeters}m of [${lng}, ${lat}]`);
+      console.warn(`  ❌ No roads found within ${radiusMeters}m`);
       return {
         lng,
         lat,
@@ -125,8 +127,10 @@ export async function snapToRoad(lng, lat, radiusMeters = 100) {
       ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'street', 'street_limited'].includes(f.properties.class)
     );
 
+    console.log(`  Filtered to ${roads.length} major roads`);
+
     if (roads.length === 0) {
-      console.warn(`No major roads found near [${lng}, ${lat}]`);
+      console.warn(`  ❌ No major roads found (only found: ${data.features.map(f => f.properties.class).join(', ')})`);
       return {
         lng,
         lat,
@@ -150,6 +154,8 @@ export async function snapToRoad(lng, lat, radiusMeters = 100) {
         roadName = road.properties.name || road.properties.class;
       }
     }
+
+    console.log(`  ✅ Snapped to "${roadName}" (${Math.round(closestDistance)}m away)`);
 
     return {
       lng: closestSnap.lng,
