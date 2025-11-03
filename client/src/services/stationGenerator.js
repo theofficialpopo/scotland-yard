@@ -220,9 +220,15 @@ export async function generateGameBoardFromBounds(bounds, center, address) {
     if (realTransitStations.length > 0) {
       console.log(`   Snapping ${realTransitStations.length} real transit stations to nearest roads...`);
 
+      // Convert coordinates from [lng, lat] array to {lng, lat} object format
+      const coordinatesForSnapping = realTransitStations.map(s => ({
+        lng: s.coordinates[0],
+        lat: s.coordinates[1]
+      }));
+
       // Snap to roads
       const snappedStations = await snapMultipleToRoads(
-        realTransitStations.map(s => s.coordinates),
+        coordinatesForSnapping,
         50 // 50m snap radius
       );
 
@@ -234,7 +240,7 @@ export async function generateGameBoardFromBounds(bounds, center, address) {
           // Find station in main array and update coordinates
           const stationInArray = stationsWithTypes.find(s => s.id === station.id);
           if (stationInArray) {
-            stationInArray.coordinates = snapped.coordinates;
+            stationInArray.coordinates = [snapped.lng, snapped.lat];
             stationInArray.snappedToRoad = true;
             snappedCount++;
           }
