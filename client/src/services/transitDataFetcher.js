@@ -287,18 +287,32 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log(`Bounding box: SW[${swLng.toFixed(4)}, ${swLat.toFixed(4)}] NE[${neLng.toFixed(4)}, ${neLat.toFixed(4)}]`);
   console.log(`Estimated radius: ${Math.round(radiusMeters)}m`);
 
-  // Fetch all transit stations using Tilequery API
-  console.log('\n📍 Fetching ALL transit stations from transit_stop_label layer...');
-  const tilequeryResult = await fetchTransitViaTilequery(center.lng, center.lat, radiusMeters, 50);
+  // Strategy: Multiple queries with different radii
+  // Rail/Metro stations are fewer and farther apart → use LARGER radius
+  // Bus stops are numerous and close together → use SMALLER radius
 
-  // Classify by mode
+  console.log('\n📍 Strategy: Multiple targeted queries for better coverage...');
+  console.log('   1️⃣ Large radius (2x) for rail/metro stations (fewer, farther apart)');
+  console.log('   2️⃣ Standard radius for bus stops (numerous, close together)');
+
+  // Query 1: LARGE radius for rail/metro/train stations (2x normal radius)
+  console.log('\n🚇 Query 1: Searching for RAIL/METRO stations (large radius)...');
+  const railRadius = radiusMeters * 2;
+  const railResult = await fetchTransitViaTilequery(center.lng, center.lat, railRadius, 50);
+
+  // Query 2: Standard radius for bus stops
+  console.log('\n🚌 Query 2: Searching for BUS stations (standard radius)...');
+  const busResult = await fetchTransitViaTilequery(center.lng, center.lat, radiusMeters, 50);
+
+  // Classify by mode from BOTH queries
   const undergroundStations = [];
   const busStations = [];
   const seenIds = new Set();
 
   console.log('\n🔍 Classifying transit stations by mode...');
 
-  tilequeryResult.features.forEach(feature => {
+  // Process rail query first (priority for underground/train)
+  railResult.features.forEach(feature => {
     const props = feature.properties || {};
     const mode = props.mode || 'unknown';
     const name = props.name || 'Unnamed Station';
@@ -319,21 +333,52 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
     };
 
     // Classify by mode
-    // Metro/subway modes: 'metro', 'metro_rail', 'light_rail'
-    if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' || mode === 'subway') {
+    // Metro/subway/rail modes → treat as "underground" for game purposes
+    if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' ||
+        mode === 'subway' || mode === 'rail' || mode === 'train' || mode === 'railway') {
       undergroundStations.push(station);
+      console.log(`   ✅ Found ${mode} station: "${name}"`);
     }
-    // Bus modes: 'bus', 'bus_rapid_transit'
+    // Bus modes
     else if (mode === 'bus' || mode === 'bus_rapid_transit') {
       busStations.push(station);
     }
-    // Rail modes could be treated as underground for game purposes
-    else if (mode === 'rail' || mode === 'train') {
+  });
+
+  // Process bus query
+  busResult.features.forEach(feature => {
+    const props = feature.properties || {};
+    const mode = props.mode || 'unknown';
+    const name = props.name || 'Unnamed Station';
+    const coords = feature.geometry?.coordinates || [0, 0];
+    const featureId = `${coords[0]}_${coords[1]}_${name}`;
+
+    // Skip duplicates
+    if (seenIds.has(featureId)) return;
+    seenIds.add(featureId);
+
+    const station = {
+      id: featureId,
+      name: name,
+      coordinates: coords,
+      mode: mode,
+      stopType: props.stop_type,
+      network: props.network
+    };
+
+    // Bus modes only
+    if (mode === 'bus' || mode === 'bus_rapid_transit') {
+      busStations.push(station);
+    }
+    // Catch any rail stations we might have missed
+    else if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' ||
+             mode === 'subway' || mode === 'rail' || mode === 'train' || mode === 'railway') {
       undergroundStations.push(station);
+      console.log(`   ✅ Found ${mode} station: "${name}" (from bus query)`);
     }
   });
 
-  console.log(`✅ Classified ${undergroundStations.length} underground/metro/rail stations`);
+  console.log(`\n✅ Classified ${undergroundStations.length} underground/metro/rail/train stations`);
   console.log(`✅ Classified ${busStations.length} bus stations`);
 
   // Summary
