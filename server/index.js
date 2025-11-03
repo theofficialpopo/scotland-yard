@@ -84,7 +84,8 @@ app.use(helmet({
         ...allowedOrigins,
         "https://api.mapbox.com",
         "https://*.tiles.mapbox.com",
-        "https://events.mapbox.com"
+        "https://events.mapbox.com",
+        "https://overpass-api.de" // OSM Overpass API for rail station data
       ],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // unsafe-eval needed for Mapbox workers
       styleSrc: ["'self'", "'unsafe-inline'"],
