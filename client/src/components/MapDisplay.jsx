@@ -91,8 +91,14 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
     }
   }, [onMapLoad]);
 
-  // Ensure viewport stays within bounds
+  // Ensure viewport stays within bounds (only for predefined cities)
   const handleMove = useCallback((evt) => {
+    if (!cityConfig || !cityConfig.bounds) {
+      // No bounds clamping for generated maps
+      setViewState(evt.viewState);
+      return;
+    }
+
     const { longitude, latitude } = evt.viewState;
     const [[swLng, swLat], [neLng, neLat]] = cityConfig.bounds;
 
@@ -105,18 +111,20 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
       longitude: clampedLng,
       latitude: clampedLat
     });
-  }, [cityConfig.bounds]);
+  }, [cityConfig]);
 
-  // Update viewport when city changes
+  // Update viewport when city changes (only for predefined cities)
   useEffect(() => {
-    setViewState({
-      longitude: cityConfig.center[0],
-      latitude: cityConfig.center[1],
-      zoom: cityConfig.zoom,
-      pitch: 0,
-      bearing: 0
-    });
-  }, [cityId, cityConfig.center, cityConfig.zoom]);
+    if (cityConfig) {
+      setViewState({
+        longitude: cityConfig.center[0],
+        latitude: cityConfig.center[1],
+        zoom: cityConfig.zoom,
+        pitch: 0,
+        bearing: 0
+      });
+    }
+  }, [cityId, cityConfig]);
 
   // Show error if no token
   if (!MAPBOX_TOKEN || MAPBOX_TOKEN === 'your_mapbox_token_here') {
