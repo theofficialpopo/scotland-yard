@@ -4,6 +4,7 @@ import AddressInput from './components/AddressInput';
 import MapDisplay from './components/MapDisplay';
 import { geocodeAddress } from './services/geocoding';
 import { generateGameBoardFromBounds } from './services/stationGenerator';
+import { researchTransitAvailability, fetchTransitStationsForGameBoard } from './services/transitDataFetcher';
 
 /**
  * MapTest - Test page for automated game board generation
@@ -19,6 +20,7 @@ function MapTest() {
   const [showMap, setShowMap] = useState(false);
   const [locationData, setLocationData] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [researching, setResearching] = useState(false);
   const mapRef = useRef(null);
 
   const handleAddressSubmit = async (address) => {
@@ -36,6 +38,50 @@ function MapTest() {
     } catch (error) {
       console.error('Failed to geocode address:', error);
       alert('Failed to find location. Please try again.');
+    }
+  };
+
+  const handleResearchTransit = async () => {
+    if (!mapRef.current) return;
+
+    setResearching(true);
+
+    try {
+      const map = mapRef.current.getMap();
+      const bounds = map.getBounds();
+      const center = map.getCenter();
+
+      // Convert bounds to array format
+      const boundsArray = [
+        [bounds.getWest(), bounds.getSouth()],
+        [bounds.getEast(), bounds.getNorth()]
+      ];
+
+      const centerObj = { lng: center.lng, lat: center.lat };
+
+      console.clear();
+      console.log('\n\n');
+      console.log('╔════════════════════════════════════════════════════════════════╗');
+      console.log('║  TRANSIT DATA RESEARCH MODE - CHECK CONSOLE FOR DETAILED LOGS  ║');
+      console.log('╚════════════════════════════════════════════════════════════════╝');
+      console.log('\n');
+
+      // Comprehensive transit research
+      await fetchTransitStationsForGameBoard(boundsArray, centerObj);
+
+      console.log('\n');
+      console.log('╔════════════════════════════════════════════════════════════════╗');
+      console.log('║  RESEARCH COMPLETE - SHARE THESE LOGS FOR ANALYSIS            ║');
+      console.log('╚════════════════════════════════════════════════════════════════╝');
+      console.log('\n\n');
+
+      alert('✅ Transit research complete! Check the browser console for detailed logs. You can copy and share these logs.');
+
+    } catch (error) {
+      console.error('❌ Research failed:', error);
+      alert('Failed to research transit data. Check console for details.');
+    } finally {
+      setResearching(false);
     }
   };
 
@@ -224,8 +270,27 @@ function MapTest() {
         </button>
 
         <button
+          onClick={handleResearchTransit}
+          disabled={researching || generating}
+          style={{
+            padding: '12px 24px',
+            background: researching ? 'rgba(100, 100, 100, 0.95)' : 'rgba(70, 130, 180, 0.95)',
+            color: '#fff',
+            border: '2px solid #4682B4',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: (researching || generating) ? 'not-allowed' : 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            animation: researching ? 'pulse 1.5s ease-in-out infinite' : 'none'
+          }}
+        >
+          {researching ? '🔍 Researching...' : '🔬 Research Transit Data'}
+        </button>
+
+        <button
           onClick={handleGenerateStations}
-          disabled={generating}
+          disabled={generating || researching}
           style={{
             padding: '12px 24px',
             background: generating ? 'rgba(100, 100, 100, 0.95)' : 'rgba(255, 215, 0, 0.95)',
@@ -234,7 +299,7 @@ function MapTest() {
             borderRadius: '8px',
             fontSize: '16px',
             fontWeight: 'bold',
-            cursor: generating ? 'not-allowed' : 'pointer',
+            cursor: (generating || researching) ? 'not-allowed' : 'pointer',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             animation: generating ? 'pulse 1.5s ease-in-out infinite' : 'none'
           }}
@@ -274,6 +339,7 @@ function MapTest() {
             lineHeight: '1.6'
           }}>
             <p style={{ margin: '8px 0' }}>Zoom in/out to set your game area size</p>
+            <p style={{ margin: '8px 0', color: '#87CEEB' }}>🔬 Click "Research Transit Data" to analyze available underground/bus stations (check console)</p>
             <p style={{ margin: '8px 0' }}>Click "Generate Stations" when ready</p>
           </div>
         </div>
