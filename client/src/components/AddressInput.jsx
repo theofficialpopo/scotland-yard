@@ -77,21 +77,20 @@ function AddressInput({ onGameBoardGenerated }) {
 
         <button
           type="submit"
-          disabled={loading}
           style={{
             width: '100%',
             padding: '14px',
             fontSize: '16px',
             fontWeight: 'bold',
-            background: loading ? '#555' : '#FFD700',
-            color: loading ? '#999' : '#1e1914',
+            background: '#FFD700',
+            color: '#1e1914',
             border: 'none',
             borderRadius: '6px',
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             transition: 'all 0.2s'
           }}
         >
-          {loading ? 'Generating...' : 'Generate Game Board'}
+          Find Location
         </button>
       </form>
 
