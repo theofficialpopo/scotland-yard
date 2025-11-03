@@ -186,22 +186,25 @@ export async function researchTransitAvailability(lng, lat, radiusMeters) {
 }
 
 /**
- * Fetch rail/train stations using OpenStreetMap Overpass API
+ * Fetch rail/train/metro/tram stations using OpenStreetMap Overpass API
  * OSM has comprehensive rail station data worldwide
  *
  * @param {number} lng - Center longitude
  * @param {number} lat - Center latitude
  * @param {number} radiusMeters - Search radius in meters
+ * @param {number} retryCount - Retry attempt number (for timeout handling)
  * @returns {Promise<Object>} Rail station data with detailed logging
  */
-async function fetchRailStationsFromOSM(lng, lat, radiusMeters) {
+async function fetchRailStationsFromOSM(lng, lat, radiusMeters, retryCount = 0) {
   // Overpass API query for rail stations
-  // Query for: railway=station (train stations), railway=halt (small stops), station=subway
+  // Query for: railway=station (train stations), railway=halt (small stops),
+  //           railway=tram_stop (tram), station=subway/light_rail
   const query = `
-    [out:json][timeout:25];
+    [out:json][timeout:30];
     (
       node["railway"="station"](around:${radiusMeters},${lat},${lng});
       node["railway"="halt"](around:${radiusMeters},${lat},${lng});
+      node["railway"="tram_stop"](around:${radiusMeters},${lat},${lng});
       node["station"="subway"](around:${radiusMeters},${lat},${lng});
       node["station"="light_rail"](around:${radiusMeters},${lat},${lng});
     );
@@ -210,16 +213,24 @@ async function fetchRailStationsFromOSM(lng, lat, radiusMeters) {
 
   const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-  console.log(`\n🚂 OVERPASS API (OSM): Searching for rail/train stations`);
+  console.log(`\n🚂 OVERPASS API (OSM): Searching for rail/train/metro/tram stations`);
   console.log(`   Location: [${lng.toFixed(6)}, ${lat.toFixed(6)}]`);
   console.log(`   Radius: ${radiusMeters}m`);
-  console.log(`   Query types: railway=station, railway=halt, station=subway/light_rail`);
+  console.log(`   Query types: railway=station/halt/tram_stop, station=subway/light_rail`);
 
   try {
     const response = await fetch(url);
 
     if (!response.ok) {
       console.error(`   ❌ API Error: ${response.status} ${response.statusText}`);
+
+      // Retry once if timeout (504 Gateway Timeout is common with Overpass)
+      if (response.status === 504 && retryCount === 0) {
+        console.log(`   ⏳ Retrying after gateway timeout...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        return fetchRailStationsFromOSM(lng, lat, radiusMeters, 1);
+      }
+
       throw new Error(`Overpass API failed: ${response.statusText}`);
     }
 
@@ -244,13 +255,14 @@ async function fetchRailStationsFromOSM(lng, lat, radiusMeters) {
       // Count by type
       const typeCount = {};
       data.elements.forEach(element => {
-        const railway = element.tags?.railway || 'unknown';
+        const tags = element.tags || {};
+        const railway = tags.railway || tags.station || 'unknown';
         typeCount[railway] = (typeCount[railway] || 0) + 1;
       });
 
       console.log(`\n      - Rail station types found:`);
       Object.entries(typeCount).forEach(([type, count]) => {
-        console.log(`        railway=${type}: ${count} stations`);
+        console.log(`        ${type}: ${count} stations`);
       });
     } else {
       console.warn(`   ⚠️ No rail stations found in this area`);
@@ -273,78 +285,77 @@ async function fetchRailStationsFromOSM(lng, lat, radiusMeters) {
 }
 
 /**
- * Fetch transit stations using Mapbox Tilequery API
- * Queries the 'transit_stop_label' layer from Mapbox Streets v8 tileset
+ * Fetch bus stops using OpenStreetMap Overpass API
+ * OSM has comprehensive bus stop data worldwide
  *
  * @param {number} lng - Center longitude
  * @param {number} lat - Center latitude
  * @param {number} radiusMeters - Search radius in meters
- * @param {number} limit - Maximum results (1-50, default: 50)
- * @returns {Promise<Object>} Transit station data with detailed logging
+ * @param {number} retryCount - Retry attempt number (for timeout handling)
+ * @returns {Promise<Object>} Bus stop data with detailed logging
  */
-async function fetchTransitViaTilequery(lng, lat, radiusMeters, limit = 50) {
-  // Mapbox Tilequery API endpoint
-  // Tileset: mapbox.mapbox-streets-v8
-  // Layer: transit_stop_label (contains all transit stops/stations)
-  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?` +
-    `radius=${radiusMeters}&` +
-    `limit=${limit}&` +
-    `layers=transit_stop_label&` +
-    `access_token=${MAPBOX_TOKEN}`;
+async function fetchBusStopsFromOSM(lng, lat, radiusMeters, retryCount = 0) {
+  // Overpass API query for bus stops
+  // Query for: highway=bus_stop and public_transport=stop_position with bus=yes
+  const query = `
+    [out:json][timeout:30];
+    (
+      node["highway"="bus_stop"](around:${radiusMeters},${lat},${lng});
+      node["public_transport"="stop_position"]["bus"="yes"](around:${radiusMeters},${lat},${lng});
+    );
+    out body;
+  `;
 
-  console.log(`\n🔍 TILEQUERY API: Searching for transit stations`);
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+  console.log(`\n🚌 OVERPASS API (OSM): Searching for bus stops`);
   console.log(`   Location: [${lng.toFixed(6)}, ${lat.toFixed(6)}]`);
   console.log(`   Radius: ${radiusMeters}m`);
-  console.log(`   Layer: transit_stop_label`);
-  console.log(`   API URL: ${url.substring(0, 120)}...`);
+  console.log(`   Query types: highway=bus_stop, public_transport=stop_position[bus=yes]`);
 
   try {
     const response = await fetch(url);
 
     if (!response.ok) {
       console.error(`   ❌ API Error: ${response.status} ${response.statusText}`);
-      throw new Error(`Mapbox Tilequery API failed: ${response.statusText}`);
+
+      // Retry once if timeout (504 Gateway Timeout is common with Overpass)
+      if (response.status === 504 && retryCount === 0) {
+        console.log(`   ⏳ Retrying after gateway timeout...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        return fetchBusStopsFromOSM(lng, lat, radiusMeters, 1);
+      }
+
+      throw new Error(`Overpass API failed: ${response.statusText}`);
     }
 
     const data = await response.json();
 
     console.log(`   📦 Response received:`);
-    console.log(`      - Features found: ${data.features?.length || 0}`);
+    console.log(`      - Features found: ${data.elements?.length || 0}`);
 
-    if (data.features && data.features.length > 0) {
-      console.log(`      - Sample features (first 5):`);
-      data.features.slice(0, 5).forEach((feature, i) => {
-        const props = feature.properties || {};
-        console.log(`        ${i + 1}. "${props.name || 'Unnamed'}" (mode: ${props.mode || 'unknown'})`);
-        console.log(`           Coords: [${feature.geometry?.coordinates?.[0]?.toFixed(6)}, ${feature.geometry?.coordinates?.[1]?.toFixed(6)}]`);
-        console.log(`           Stop type: ${props.stop_type || 'unknown'}`);
-        console.log(`           Network: ${props.network || 'N/A'}`);
-        console.log(`           All properties:`, props);
-      });
-
-      // Count by mode
-      const modeCount = {};
-      data.features.forEach(feature => {
-        const mode = feature.properties?.mode || 'unknown';
-        modeCount[mode] = (modeCount[mode] || 0) + 1;
-      });
-
-      console.log(`\n      - Transit modes found:`);
-      Object.entries(modeCount).forEach(([mode, count]) => {
-        console.log(`        ${mode}: ${count} stations`);
+    if (data.elements && data.elements.length > 0) {
+      console.log(`      - Sample bus stops (first 5):`);
+      data.elements.slice(0, 5).forEach((element, i) => {
+        const tags = element.tags || {};
+        const name = tags.name || 'Unnamed Bus Stop';
+        console.log(`        ${i + 1}. "${name}"`);
+        console.log(`           Coords: [${element.lon?.toFixed(6)}, ${element.lat?.toFixed(6)}]`);
+        console.log(`           Operator: ${tags.operator || 'N/A'}`);
+        console.log(`           Network: ${tags.network || 'N/A'}`);
       });
     } else {
-      console.warn(`   ⚠️ No transit stations found in this area`);
+      console.warn(`   ⚠️ No bus stops found in this area`);
     }
 
     return {
-      count: data.features?.length || 0,
-      features: data.features || [],
+      count: data.elements?.length || 0,
+      features: data.elements || [],
       raw: data
     };
 
   } catch (error) {
-    console.error(`   ❌ Error fetching transit data:`, error.message);
+    console.error(`   ❌ Error fetching bus stops from OSM:`, error.message);
     return {
       count: 0,
       features: [],
@@ -355,7 +366,7 @@ async function fetchTransitViaTilequery(lng, lat, radiusMeters, limit = 50) {
 
 /**
  * Fetch and classify transit stations for game board generation
- * Implements fallback logic for areas with limited transit
+ * Pure OSM Overpass API approach with two separate calls
  *
  * @param {Array} bounds - Bounding box [[swLng, swLat], [neLng, neLat]]
  * @param {Object} center - Center point {lng, lat}
@@ -363,7 +374,7 @@ async function fetchTransitViaTilequery(lng, lat, radiusMeters, limit = 50) {
  */
 export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log('\n' + '='.repeat(80));
-  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD (HYBRID APPROACH)');
+  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD (PURE OSM APPROACH)');
   console.log('='.repeat(80));
 
   const [[swLng, swLat], [neLng, neLat]] = bounds;
@@ -374,29 +385,29 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log(`Bounding box: SW[${swLng.toFixed(4)}, ${swLat.toFixed(4)}] NE[${neLng.toFixed(4)}, ${neLat.toFixed(4)}]`);
   console.log(`Estimated radius: ${Math.round(radiusMeters)}m`);
 
-  // Strategy: Hybrid approach using best data source for each transit type
-  // OSM (Overpass) → Rail/train stations (comprehensive global coverage)
-  // Mapbox Tilequery → Bus stops (works well, fast)
+  // Strategy: Pure OSM approach with two separate calls
+  // OSM Call 1 → Rail/train/metro/tram stations (comprehensive global coverage)
+  // OSM Call 2 → Bus stops (comprehensive global coverage)
 
-  console.log('\n📍 Strategy: Hybrid data sources for optimal coverage...');
-  console.log('   1️⃣ OpenStreetMap (Overpass API) for rail/train/metro stations');
-  console.log('   2️⃣ Mapbox Tilequery for bus stops');
+  console.log('\n📍 Strategy: Pure OpenStreetMap (Overpass API) for all transit data...');
+  console.log('   1️⃣ Call 1: Rail/train/metro/tram stations');
+  console.log('   2️⃣ Call 2: Bus stops');
 
-  // Query 1: OSM Overpass for rail/train/metro stations
-  console.log('\n🚂 Query 1: Fetching RAIL/TRAIN stations from OpenStreetMap...');
+  // Query 1: OSM Overpass for rail/train/metro/tram stations
+  console.log('\n🚂 Query 1: Fetching RAIL/TRAIN/METRO/TRAM stations from OpenStreetMap...');
   const railRadius = radiusMeters * 1.5; // Slightly larger for rail stations
   const osmRailResult = await fetchRailStationsFromOSM(center.lng, center.lat, railRadius);
 
-  // Query 2: Mapbox Tilequery for bus stops
-  console.log('\n🚌 Query 2: Fetching BUS stops from Mapbox...');
-  const busResult = await fetchTransitViaTilequery(center.lng, center.lat, radiusMeters, 50);
+  // Query 2: OSM Overpass for bus stops
+  console.log('\n🚌 Query 2: Fetching BUS stops from OpenStreetMap...');
+  const osmBusResult = await fetchBusStopsFromOSM(center.lng, center.lat, radiusMeters);
 
   // Process results
   const undergroundStations = [];
   const busStations = [];
   const seenIds = new Set();
 
-  console.log('\n🔍 Processing rail stations from OSM...');
+  console.log('\n🔍 Processing rail/train/metro/tram stations from OSM...');
 
   // Process OSM rail stations
   osmRailResult.features.forEach(element => {
@@ -413,24 +424,32 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
       id: featureId,
       name: name,
       coordinates: coords,
-      mode: 'rail', // All from OSM are rail/train/metro
+      mode: 'rail', // All from rail query are rail/train/metro/tram
       railwayType: tags.railway,
       stationType: tags.station,
-      operator: tags.operator
+      operator: tags.operator,
+      network: tags.network
     };
 
     undergroundStations.push(station);
-    console.log(`   ✅ Found rail station: "${name}" (${tags.railway || 'unknown type'})`);
+
+    // Log first 10 stations
+    if (undergroundStations.length <= 10) {
+      console.log(`   ✅ Found rail station: "${name}" (${tags.railway || tags.station || 'unknown type'})`);
+    }
   });
 
-  console.log('\n🔍 Processing bus stops from Mapbox...');
+  if (undergroundStations.length > 10) {
+    console.log(`   ... and ${undergroundStations.length - 10} more rail stations`);
+  }
 
-  // Process Mapbox bus stops
-  busResult.features.forEach(feature => {
-    const props = feature.properties || {};
-    const mode = props.mode || 'unknown';
-    const name = props.name || 'Unnamed Station';
-    const coords = feature.geometry?.coordinates || [0, 0];
+  console.log('\n🔍 Processing bus stops from OSM...');
+
+  // Process OSM bus stops
+  osmBusResult.features.forEach(element => {
+    const tags = element.tags || {};
+    const name = tags.name || 'Unnamed Bus Stop';
+    const coords = [element.lon, element.lat];
     const featureId = `${coords[0]}_${coords[1]}_${name}`;
 
     // Skip duplicates
@@ -441,19 +460,25 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
       id: featureId,
       name: name,
       coordinates: coords,
-      mode: mode,
-      stopType: props.stop_type,
-      network: props.network
+      mode: 'bus',
+      operator: tags.operator,
+      network: tags.network
     };
 
-    // Only bus stops
-    if (mode === 'bus' || mode === 'bus_rapid_transit') {
-      busStations.push(station);
+    busStations.push(station);
+
+    // Log first 10 stations
+    if (busStations.length <= 10) {
+      console.log(`   ✅ Found bus stop: "${name}"`);
     }
   });
 
-  console.log(`\n✅ Processed ${undergroundStations.length} rail/train/metro stations (from OSM)`);
-  console.log(`✅ Processed ${busStations.length} bus stations (from Mapbox)`);
+  if (busStations.length > 10) {
+    console.log(`   ... and ${busStations.length - 10} more bus stops`);
+  }
+
+  console.log(`\n✅ Processed ${undergroundStations.length} rail/train/metro/tram stations (from OSM)`);
+  console.log(`✅ Processed ${busStations.length} bus stops (from OSM)`);
 
   // Summary
   console.log('\n' + '='.repeat(80));
@@ -464,14 +489,14 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log(`Total transit stations: ${undergroundStations.length + busStations.length}`);
 
   // Calculate what we need for Scotland Yard ratios
-  const targetUnderground = 17; // Stations with underground
-  const targetBus = 62; // Stations with bus (but no underground)
-  const targetTaxiOnly = 120; // Taxi-only stations
+  const targetUnderground = 20; // Stations with underground (Scotland Yard authentic ratio)
+  const targetBus = 80; // Stations with bus (but no underground)
+  const targetTaxiOnly = 99; // Taxi-only stations
 
-  console.log('\n📋 TARGET vs ACTUAL:');
+  console.log('\n📋 TARGET vs ACTUAL (Scotland Yard authentic ratios):');
   console.log(`Underground: ${undergroundStations.length}/${targetUnderground} (need ${Math.max(0, targetUnderground - undergroundStations.length)} more)`);
   console.log(`Bus: ${busStations.length}/${targetBus} (need ${Math.max(0, targetBus - busStations.length)} more)`);
-  console.log(`Taxi-only: Will fill remaining ${targetTaxiOnly} stations`);
+  console.log(`Taxi-only: Will fill remaining ${targetTaxiOnly} stations with template`);
 
   // Determine if we need fallback
   const needsUndergroundFallback = undergroundStations.length < targetUnderground;
