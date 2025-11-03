@@ -16,19 +16,19 @@ export const AREA_TYPES = {
     id: 'MAJOR_CITY',
     name: 'Major City',
     description: 'Large metropolitan area (>1M population)',
-    roadClasses: ['motorway', 'trunk', 'primary', 'secondary'],  // Include secondary roads
-    minRoadSpacing: 400,  // meters between stations
-    stationCount: 20,
-    searchRadius: 2000    // meters
+    roadClasses: ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'],  // Include more road types
+    minRoadSpacing: 300,  // meters between stations
+    stationCount: 18,     // Reduced to match existing game configs
+    searchRadius: 1500    // Smaller radius for denser coverage
   },
   CITY: {
     id: 'CITY',
     name: 'City',
     description: 'Mid-size city (100K-1M population)',
-    roadClasses: ['motorway', 'trunk', 'primary', 'secondary'],
-    minRoadSpacing: 350,
-    stationCount: 18,
-    searchRadius: 1800
+    roadClasses: ['motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
+    minRoadSpacing: 250,
+    stationCount: 16,
+    searchRadius: 1500
   },
   SUBURB: {
     id: 'SUBURB',
