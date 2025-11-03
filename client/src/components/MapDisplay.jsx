@@ -14,11 +14,13 @@ import { getCityConfig } from '../data/cityMaps';
  * - Minimal UI for focused gameplay
  *
  * Props:
- * - cityId: The city to display (e.g., 'london', 'newyork')
+ * - cityId: The city to display (e.g., 'london', 'newyork', 'generated')
  * - onMapLoad: Callback when map is loaded and ready
  * - children: Optional overlay components (stations, player markers, etc.)
+ * - generatedCenter: Center point for generated maps (optional, {lng, lat})
+ * - generatedBounds: Bounds for generated maps (optional, [[swLng, swLat], [neLng, neLat]])
  */
-function MapDisplay({ cityId = 'london', onMapLoad, children }) {
+function MapDisplay({ cityId = 'london', onMapLoad, children, generatedCenter, generatedBounds }) {
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
@@ -30,9 +32,9 @@ function MapDisplay({ cityId = 'london', onMapLoad, children }) {
 
   // Initial viewport state
   const [viewState, setViewState] = useState({
-    longitude: cityConfig ? cityConfig.center[0] : 0,
-    latitude: cityConfig ? cityConfig.center[1] : 0,
-    zoom: cityConfig ? cityConfig.zoom : 12,
+    longitude: cityConfig ? cityConfig.center[0] : (generatedCenter ? generatedCenter.lng : 0),
+    latitude: cityConfig ? cityConfig.center[1] : (generatedCenter ? generatedCenter.lat : 0),
+    zoom: cityConfig ? cityConfig.zoom : 13,
     pitch: 0,    // Keep flat for game board
     bearing: 0   // North up
   });

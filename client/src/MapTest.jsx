@@ -113,6 +113,8 @@ function MapTest() {
       <MapDisplay
         cityId="generated"  // Not using predefined cities
         onMapLoad={handleMapLoad}
+        generatedCenter={gameBoard.center}
+        generatedBounds={gameBoard.bounds}
       >
         {/* Station Markers */}
         {gameBoard.stations.map((station) => (
