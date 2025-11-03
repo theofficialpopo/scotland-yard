@@ -186,6 +186,87 @@ export async function researchTransitAvailability(lng, lat, radiusMeters) {
 }
 
 /**
+ * Fetch transit stations using Mapbox Tilequery API
+ * Queries the 'transit_stop_label' layer from Mapbox Streets v8 tileset
+ *
+ * @param {number} lng - Center longitude
+ * @param {number} lat - Center latitude
+ * @param {number} radiusMeters - Search radius in meters
+ * @param {number} limit - Maximum results (1-50, default: 50)
+ * @returns {Promise<Object>} Transit station data with detailed logging
+ */
+async function fetchTransitViaTilequery(lng, lat, radiusMeters, limit = 50) {
+  // Mapbox Tilequery API endpoint
+  // Tileset: mapbox.mapbox-streets-v8
+  // Layer: transit_stop_label (contains all transit stops/stations)
+  const url = `https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/tilequery/${lng},${lat}.json?` +
+    `radius=${radiusMeters}&` +
+    `limit=${limit}&` +
+    `layers=transit_stop_label&` +
+    `access_token=${MAPBOX_TOKEN}`;
+
+  console.log(`\n🔍 TILEQUERY API: Searching for transit stations`);
+  console.log(`   Location: [${lng.toFixed(6)}, ${lat.toFixed(6)}]`);
+  console.log(`   Radius: ${radiusMeters}m`);
+  console.log(`   Layer: transit_stop_label`);
+  console.log(`   API URL: ${url.substring(0, 120)}...`);
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error(`   ❌ API Error: ${response.status} ${response.statusText}`);
+      throw new Error(`Mapbox Tilequery API failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    console.log(`   📦 Response received:`);
+    console.log(`      - Features found: ${data.features?.length || 0}`);
+
+    if (data.features && data.features.length > 0) {
+      console.log(`      - Sample features (first 5):`);
+      data.features.slice(0, 5).forEach((feature, i) => {
+        const props = feature.properties || {};
+        console.log(`        ${i + 1}. "${props.name || 'Unnamed'}" (mode: ${props.mode || 'unknown'})`);
+        console.log(`           Coords: [${feature.geometry?.coordinates?.[0]?.toFixed(6)}, ${feature.geometry?.coordinates?.[1]?.toFixed(6)}]`);
+        console.log(`           Stop type: ${props.stop_type || 'unknown'}`);
+        console.log(`           Network: ${props.network || 'N/A'}`);
+        console.log(`           All properties:`, props);
+      });
+
+      // Count by mode
+      const modeCount = {};
+      data.features.forEach(feature => {
+        const mode = feature.properties?.mode || 'unknown';
+        modeCount[mode] = (modeCount[mode] || 0) + 1;
+      });
+
+      console.log(`\n      - Transit modes found:`);
+      Object.entries(modeCount).forEach(([mode, count]) => {
+        console.log(`        ${mode}: ${count} stations`);
+      });
+    } else {
+      console.warn(`   ⚠️ No transit stations found in this area`);
+    }
+
+    return {
+      count: data.features?.length || 0,
+      features: data.features || [],
+      raw: data
+    };
+
+  } catch (error) {
+    console.error(`   ❌ Error fetching transit data:`, error.message);
+    return {
+      count: 0,
+      features: [],
+      error: error.message
+    };
+  }
+}
+
+/**
  * Fetch and classify transit stations for game board generation
  * Implements fallback logic for areas with limited transit
  *
@@ -195,7 +276,7 @@ export async function researchTransitAvailability(lng, lat, radiusMeters) {
  */
 export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log('\n' + '='.repeat(80));
-  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD');
+  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD (TILEQUERY API)');
   console.log('='.repeat(80));
 
   const [[swLng, swLat], [neLng, neLat]] = bounds;
@@ -206,62 +287,54 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log(`Bounding box: SW[${swLng.toFixed(4)}, ${swLat.toFixed(4)}] NE[${neLng.toFixed(4)}, ${neLat.toFixed(4)}]`);
   console.log(`Estimated radius: ${Math.round(radiusMeters)}m`);
 
-  // Step 1: Search for underground/metro/subway stations
-  console.log('\n📍 Step 1: Searching for UNDERGROUND stations...');
-  const undergroundResults = await Promise.all([
-    fetchTransitPOIs(center.lng, center.lat, 'subway', radiusMeters, 50),
-    fetchTransitPOIs(center.lng, center.lat, 'metro', radiusMeters, 50),
-    fetchTransitPOIs(center.lng, center.lat, 'underground', radiusMeters, 50)
-  ]);
+  // Fetch all transit stations using Tilequery API
+  console.log('\n📍 Fetching ALL transit stations from transit_stop_label layer...');
+  const tilequeryResult = await fetchTransitViaTilequery(center.lng, center.lat, radiusMeters, 50);
 
-  // Merge and deduplicate underground stations
+  // Classify by mode
   const undergroundStations = [];
+  const busStations = [];
   const seenIds = new Set();
 
-  undergroundResults.forEach(result => {
-    result.features.forEach(feature => {
-      if (!seenIds.has(feature.id)) {
-        seenIds.add(feature.id);
-        undergroundStations.push({
-          id: feature.id,
-          name: feature.text,
-          coordinates: feature.center,
-          fullName: feature.place_name,
-          category: feature.properties?.category,
-          maki: feature.properties?.maki
-        });
-      }
-    });
+  console.log('\n🔍 Classifying transit stations by mode...');
+
+  tilequeryResult.features.forEach(feature => {
+    const props = feature.properties || {};
+    const mode = props.mode || 'unknown';
+    const name = props.name || 'Unnamed Station';
+    const coords = feature.geometry?.coordinates || [0, 0];
+    const featureId = `${coords[0]}_${coords[1]}_${name}`;
+
+    // Skip duplicates
+    if (seenIds.has(featureId)) return;
+    seenIds.add(featureId);
+
+    const station = {
+      id: featureId,
+      name: name,
+      coordinates: coords,
+      mode: mode,
+      stopType: props.stop_type,
+      network: props.network
+    };
+
+    // Classify by mode
+    // Metro/subway modes: 'metro', 'metro_rail', 'light_rail'
+    if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' || mode === 'subway') {
+      undergroundStations.push(station);
+    }
+    // Bus modes: 'bus', 'bus_rapid_transit'
+    else if (mode === 'bus' || mode === 'bus_rapid_transit') {
+      busStations.push(station);
+    }
+    // Rail modes could be treated as underground for game purposes
+    else if (mode === 'rail' || mode === 'train') {
+      undergroundStations.push(station);
+    }
   });
 
-  console.log(`✅ Found ${undergroundStations.length} unique underground stations`);
-
-  // Step 2: Search for bus stops/stations
-  console.log('\n🚌 Step 2: Searching for BUS stations...');
-  const busResults = await Promise.all([
-    fetchTransitPOIs(center.lng, center.lat, 'bus stop', radiusMeters, 50),
-    fetchTransitPOIs(center.lng, center.lat, 'bus station', radiusMeters, 50)
-  ]);
-
-  // Merge and deduplicate bus stops
-  const busStations = [];
-  busResults.forEach(result => {
-    result.features.forEach(feature => {
-      if (!seenIds.has(feature.id)) {
-        seenIds.add(feature.id);
-        busStations.push({
-          id: feature.id,
-          name: feature.text,
-          coordinates: feature.center,
-          fullName: feature.place_name,
-          category: feature.properties?.category,
-          maki: feature.properties?.maki
-        });
-      }
-    });
-  });
-
-  console.log(`✅ Found ${busStations.length} unique bus stations`);
+  console.log(`✅ Classified ${undergroundStations.length} underground/metro/rail stations`);
+  console.log(`✅ Classified ${busStations.length} bus stations`);
 
   // Summary
   console.log('\n' + '='.repeat(80));
