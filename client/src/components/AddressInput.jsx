@@ -1,50 +1,25 @@
 import { useState } from 'react';
-import { generateGameBoard, validateGameBoard } from '../services/stationGenerator';
 
 /**
- * AddressInput - Component for entering an address and generating a game board
+ * AddressInput - Component for entering an address
  *
  * Props:
- * - onGameBoardGenerated: Callback when game board is successfully generated
+ * - onGameBoardGenerated: Callback when address is submitted (receives address string)
  */
 function AddressInput({ onGameBoardGenerated }) {
   const [address, setAddress] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [validation, setValidation] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!address.trim()) {
-      setError('Please enter an address');
+      alert('Please enter an address');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setValidation(null);
-
-    try {
-      console.log('Generating game board for:', address);
-
-      // Generate the game board
-      const gameBoard = await generateGameBoard(address);
-
-      // Validate it
-      const validationResult = validateGameBoard(gameBoard);
-      setValidation(validationResult);
-
-      // Call parent callback
-      if (onGameBoardGenerated) {
-        onGameBoardGenerated(gameBoard);
-      }
-
-    } catch (err) {
-      console.error('Failed to generate game board:', err);
-      setError(err.message || 'Failed to generate game board');
-    } finally {
-      setLoading(false);
+    // Just pass the address to parent
+    if (onGameBoardGenerated) {
+      onGameBoardGenerated(address.trim());
     }
   };
 
@@ -78,8 +53,7 @@ function AddressInput({ onGameBoardGenerated }) {
         fontSize: '14px',
         lineHeight: '1.6'
       }}>
-        Enter any address worldwide. The system will automatically find intersections
-        and place stations for a Scotland Yard game.
+        Enter any address worldwide to center the map, then adjust the zoom and generate stations.
       </p>
 
       <form onSubmit={handleSubmit}>
@@ -88,7 +62,6 @@ function AddressInput({ onGameBoardGenerated }) {
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Enter address (e.g., '10 Downing Street, London')"
-          disabled={loading}
           style={{
             width: '100%',
             padding: '12px',
@@ -137,7 +110,6 @@ function AddressInput({ onGameBoardGenerated }) {
             <button
               key={example}
               onClick={() => handleTryExample(example)}
-              disabled={loading}
               style={{
                 padding: '6px 12px',
                 fontSize: '12px',
@@ -145,7 +117,7 @@ function AddressInput({ onGameBoardGenerated }) {
                 color: '#FFD700',
                 border: '1px solid #8B4513',
                 borderRadius: '4px',
-                cursor: loading ? 'not-allowed' : 'pointer'
+                cursor: 'pointer'
               }}
             >
               {example.split(',')[0]}
@@ -153,60 +125,6 @@ function AddressInput({ onGameBoardGenerated }) {
           ))}
         </div>
       </div>
-
-      {/* Error message */}
-      {error && (
-        <div style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: 'rgba(220, 53, 69, 0.2)',
-          border: '1px solid #dc3545',
-          borderRadius: '6px',
-          color: '#ff6b7a'
-        }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
-
-      {/* Validation warnings */}
-      {validation && validation.warnings.length > 0 && (
-        <div style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: 'rgba(255, 193, 7, 0.2)',
-          border: '1px solid #ffc107',
-          borderRadius: '6px',
-          color: '#ffc107'
-        }}>
-          <strong>Warnings:</strong>
-          <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
-            {validation.warnings.map((warning, index) => (
-              <li key={index} style={{ marginBottom: '4px' }}>
-                {warning}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Success stats */}
-      {validation && validation.valid && (
-        <div style={{
-          marginTop: '20px',
-          padding: '12px',
-          background: 'rgba(40, 167, 69, 0.2)',
-          border: '1px solid #28a745',
-          borderRadius: '6px',
-          color: '#28a745'
-        }}>
-          <strong>Success!</strong> Generated {validation.stats.stationCount} stations.
-          <br />
-          <span style={{ fontSize: '12px' }}>
-            Avg distance: {validation.stats.avgStationDistance}m •
-            Min distance: {validation.stats.minStationDistance}m
-          </span>
-        </div>
-      )}
     </div>
   );
 }

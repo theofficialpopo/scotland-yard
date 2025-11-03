@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, forwardRef } from 'react';
 import Map from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { getCityConfig } from '../data/cityMaps';
@@ -20,8 +20,8 @@ import { getCityConfig } from '../data/cityMaps';
  * - generatedCenter: Center point for generated maps (optional, {lng, lat})
  * - generatedBounds: Bounds for generated maps (optional, [[swLng, swLat], [neLng, neLat]])
  */
-function MapDisplay({ cityId = 'london', onMapLoad, children, generatedCenter, generatedBounds }) {
-  const mapRef = useRef(null);
+const MapDisplay = forwardRef(({ cityId = 'london', onMapLoad, children, generatedCenter, generatedBounds }, ref) => {
+  const mapRef = ref || useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
   // Get city configuration (if using predefined city)
@@ -277,6 +277,8 @@ function MapDisplay({ cityId = 'london', onMapLoad, children, generatedCenter, g
       `}</style>
     </div>
   );
-}
+});
+
+MapDisplay.displayName = 'MapDisplay';
 
 export default MapDisplay;
