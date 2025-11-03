@@ -186,6 +186,93 @@ export async function researchTransitAvailability(lng, lat, radiusMeters) {
 }
 
 /**
+ * Fetch rail/train stations using OpenStreetMap Overpass API
+ * OSM has comprehensive rail station data worldwide
+ *
+ * @param {number} lng - Center longitude
+ * @param {number} lat - Center latitude
+ * @param {number} radiusMeters - Search radius in meters
+ * @returns {Promise<Object>} Rail station data with detailed logging
+ */
+async function fetchRailStationsFromOSM(lng, lat, radiusMeters) {
+  // Overpass API query for rail stations
+  // Query for: railway=station (train stations), railway=halt (small stops), station=subway
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["railway"="station"](around:${radiusMeters},${lat},${lng});
+      node["railway"="halt"](around:${radiusMeters},${lat},${lng});
+      node["station"="subway"](around:${radiusMeters},${lat},${lng});
+      node["station"="light_rail"](around:${radiusMeters},${lat},${lng});
+    );
+    out body;
+  `;
+
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+  console.log(`\n🚂 OVERPASS API (OSM): Searching for rail/train stations`);
+  console.log(`   Location: [${lng.toFixed(6)}, ${lat.toFixed(6)}]`);
+  console.log(`   Radius: ${radiusMeters}m`);
+  console.log(`   Query types: railway=station, railway=halt, station=subway/light_rail`);
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error(`   ❌ API Error: ${response.status} ${response.statusText}`);
+      throw new Error(`Overpass API failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    console.log(`   📦 Response received:`);
+    console.log(`      - Features found: ${data.elements?.length || 0}`);
+
+    if (data.elements && data.elements.length > 0) {
+      console.log(`      - Sample rail stations (first 5):`);
+      data.elements.slice(0, 5).forEach((element, i) => {
+        const tags = element.tags || {};
+        const name = tags.name || 'Unnamed Station';
+        const railway = tags.railway || 'unknown';
+        const stationType = tags.station || 'none';
+        console.log(`        ${i + 1}. "${name}"`);
+        console.log(`           Coords: [${element.lon?.toFixed(6)}, ${element.lat?.toFixed(6)}]`);
+        console.log(`           Type: railway=${railway}, station=${stationType}`);
+        console.log(`           Operator: ${tags.operator || 'N/A'}`);
+      });
+
+      // Count by type
+      const typeCount = {};
+      data.elements.forEach(element => {
+        const railway = element.tags?.railway || 'unknown';
+        typeCount[railway] = (typeCount[railway] || 0) + 1;
+      });
+
+      console.log(`\n      - Rail station types found:`);
+      Object.entries(typeCount).forEach(([type, count]) => {
+        console.log(`        railway=${type}: ${count} stations`);
+      });
+    } else {
+      console.warn(`   ⚠️ No rail stations found in this area`);
+    }
+
+    return {
+      count: data.elements?.length || 0,
+      features: data.elements || [],
+      raw: data
+    };
+
+  } catch (error) {
+    console.error(`   ❌ Error fetching rail stations from OSM:`, error.message);
+    return {
+      count: 0,
+      features: [],
+      error: error.message
+    };
+  }
+}
+
+/**
  * Fetch transit stations using Mapbox Tilequery API
  * Queries the 'transit_stop_label' layer from Mapbox Streets v8 tileset
  *
@@ -276,7 +363,7 @@ async function fetchTransitViaTilequery(lng, lat, radiusMeters, limit = 50) {
  */
 export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log('\n' + '='.repeat(80));
-  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD (TILEQUERY API)');
+  console.log('🎲 FETCHING TRANSIT DATA FOR GAME BOARD (HYBRID APPROACH)');
   console.log('='.repeat(80));
 
   const [[swLng, swLat], [neLng, neLat]] = bounds;
@@ -287,36 +374,35 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log(`Bounding box: SW[${swLng.toFixed(4)}, ${swLat.toFixed(4)}] NE[${neLng.toFixed(4)}, ${neLat.toFixed(4)}]`);
   console.log(`Estimated radius: ${Math.round(radiusMeters)}m`);
 
-  // Strategy: Multiple queries with different radii
-  // Rail/Metro stations are fewer and farther apart → use LARGER radius
-  // Bus stops are numerous and close together → use SMALLER radius
+  // Strategy: Hybrid approach using best data source for each transit type
+  // OSM (Overpass) → Rail/train stations (comprehensive global coverage)
+  // Mapbox Tilequery → Bus stops (works well, fast)
 
-  console.log('\n📍 Strategy: Multiple targeted queries for better coverage...');
-  console.log('   1️⃣ Large radius (2x) for rail/metro stations (fewer, farther apart)');
-  console.log('   2️⃣ Standard radius for bus stops (numerous, close together)');
+  console.log('\n📍 Strategy: Hybrid data sources for optimal coverage...');
+  console.log('   1️⃣ OpenStreetMap (Overpass API) for rail/train/metro stations');
+  console.log('   2️⃣ Mapbox Tilequery for bus stops');
 
-  // Query 1: LARGE radius for rail/metro/train stations (2x normal radius)
-  console.log('\n🚇 Query 1: Searching for RAIL/METRO stations (large radius)...');
-  const railRadius = radiusMeters * 2;
-  const railResult = await fetchTransitViaTilequery(center.lng, center.lat, railRadius, 50);
+  // Query 1: OSM Overpass for rail/train/metro stations
+  console.log('\n🚂 Query 1: Fetching RAIL/TRAIN stations from OpenStreetMap...');
+  const railRadius = radiusMeters * 1.5; // Slightly larger for rail stations
+  const osmRailResult = await fetchRailStationsFromOSM(center.lng, center.lat, railRadius);
 
-  // Query 2: Standard radius for bus stops
-  console.log('\n🚌 Query 2: Searching for BUS stations (standard radius)...');
+  // Query 2: Mapbox Tilequery for bus stops
+  console.log('\n🚌 Query 2: Fetching BUS stops from Mapbox...');
   const busResult = await fetchTransitViaTilequery(center.lng, center.lat, radiusMeters, 50);
 
-  // Classify by mode from BOTH queries
+  // Process results
   const undergroundStations = [];
   const busStations = [];
   const seenIds = new Set();
 
-  console.log('\n🔍 Classifying transit stations by mode...');
+  console.log('\n🔍 Processing rail stations from OSM...');
 
-  // Process rail query first (priority for underground/train)
-  railResult.features.forEach(feature => {
-    const props = feature.properties || {};
-    const mode = props.mode || 'unknown';
-    const name = props.name || 'Unnamed Station';
-    const coords = feature.geometry?.coordinates || [0, 0];
+  // Process OSM rail stations
+  osmRailResult.features.forEach(element => {
+    const tags = element.tags || {};
+    const name = tags.name || 'Unnamed Station';
+    const coords = [element.lon, element.lat];
     const featureId = `${coords[0]}_${coords[1]}_${name}`;
 
     // Skip duplicates
@@ -327,25 +413,19 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
       id: featureId,
       name: name,
       coordinates: coords,
-      mode: mode,
-      stopType: props.stop_type,
-      network: props.network
+      mode: 'rail', // All from OSM are rail/train/metro
+      railwayType: tags.railway,
+      stationType: tags.station,
+      operator: tags.operator
     };
 
-    // Classify by mode
-    // Metro/subway/rail modes → treat as "underground" for game purposes
-    if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' ||
-        mode === 'subway' || mode === 'rail' || mode === 'train' || mode === 'railway') {
-      undergroundStations.push(station);
-      console.log(`   ✅ Found ${mode} station: "${name}"`);
-    }
-    // Bus modes
-    else if (mode === 'bus' || mode === 'bus_rapid_transit') {
-      busStations.push(station);
-    }
+    undergroundStations.push(station);
+    console.log(`   ✅ Found rail station: "${name}" (${tags.railway || 'unknown type'})`);
   });
 
-  // Process bus query
+  console.log('\n🔍 Processing bus stops from Mapbox...');
+
+  // Process Mapbox bus stops
   busResult.features.forEach(feature => {
     const props = feature.properties || {};
     const mode = props.mode || 'unknown';
@@ -366,20 +446,14 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
       network: props.network
     };
 
-    // Bus modes only
+    // Only bus stops
     if (mode === 'bus' || mode === 'bus_rapid_transit') {
       busStations.push(station);
     }
-    // Catch any rail stations we might have missed
-    else if (mode === 'metro' || mode === 'metro_rail' || mode === 'light_rail' ||
-             mode === 'subway' || mode === 'rail' || mode === 'train' || mode === 'railway') {
-      undergroundStations.push(station);
-      console.log(`   ✅ Found ${mode} station: "${name}" (from bus query)`);
-    }
   });
 
-  console.log(`\n✅ Classified ${undergroundStations.length} underground/metro/rail/train stations`);
-  console.log(`✅ Classified ${busStations.length} bus stations`);
+  console.log(`\n✅ Processed ${undergroundStations.length} rail/train/metro stations (from OSM)`);
+  console.log(`✅ Processed ${busStations.length} bus stations (from Mapbox)`);
 
   // Summary
   console.log('\n' + '='.repeat(80));
