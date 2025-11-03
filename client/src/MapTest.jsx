@@ -223,26 +223,24 @@ function MapTest() {
           ← New Address
         </button>
 
-        {!gameBoard && (
-          <button
-            onClick={handleGenerateStations}
-            disabled={generating}
-            style={{
-              padding: '12px 24px',
-              background: generating ? 'rgba(100, 100, 100, 0.95)' : 'rgba(255, 215, 0, 0.95)',
-              color: generating ? '#ccc' : '#1e1914',
-              border: '2px solid #8B4513',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: 'bold',
-              cursor: generating ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              animation: generating ? 'pulse 1.5s ease-in-out infinite' : 'none'
-            }}
-          >
-            {generating ? '⏳ Generating...' : '🎲 Generate Stations'}
-          </button>
-        )}
+        <button
+          onClick={handleGenerateStations}
+          disabled={generating}
+          style={{
+            padding: '12px 24px',
+            background: generating ? 'rgba(100, 100, 100, 0.95)' : 'rgba(255, 215, 0, 0.95)',
+            color: generating ? '#ccc' : '#1e1914',
+            border: '2px solid #8B4513',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: generating ? 'not-allowed' : 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            animation: generating ? 'pulse 1.5s ease-in-out infinite' : 'none'
+          }}
+        >
+          {generating ? '⏳ Generating...' : (gameBoard ? '🔄 Regenerate Stations' : '🎲 Generate Stations')}
+        </button>
       </div>
 
       {/* Info Panel */}

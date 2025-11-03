@@ -1,39 +1,45 @@
 /**
  * Scotland Yard Station Template
  *
- * Based on the classic Scotland Yard board game layout.
- * The original game has 199 stations (numbered 1-200 with station 108 or 200 missing).
- * Positions are relative (0-1 range) for x and y coordinates,
- * which will be scaled to fit any geographic bounding box.
+ * Based on the actual Scotland Yard board game layout.
+ * The game has 199 stations with a clustered-center, sparse-periphery pattern.
+ * Stations concentrate in the middle regions forming an irregular organic shape.
  */
 
 /**
- * Generate 199 stations in a well-distributed pattern
- * Mimics the Scotland Yard board game's extensive network
+ * Generate 199 stations matching the real Scotland Yard board layout
+ * Pattern: Dense center, sparse edges, organic irregular distribution
  */
-function generateStationGrid() {
+function generateScotlandYardLayout() {
   const stations = [];
-  const gridSize = Math.ceil(Math.sqrt(199)); // ~15x15 grid
-  const cellSize = 1.0 / gridSize;
 
-  // Generate grid positions with some randomization for natural layout
-  for (let i = 0; i < 199; i++) {
-    const row = Math.floor(i / gridSize);
-    const col = i % gridSize;
+  // Define cluster centers (multiple hubs like in the real game)
+  const clusters = [
+    { cx: 0.50, cy: 0.50, radius: 0.25, count: 60 },  // Main central cluster
+    { cx: 0.35, cy: 0.40, radius: 0.15, count: 30 },  // West-central hub
+    { cx: 0.65, cy: 0.45, radius: 0.15, count: 30 },  // East-central hub
+    { cx: 0.45, cy: 0.65, radius: 0.12, count: 25 },  // North-central
+    { cx: 0.55, cy: 0.35, radius: 0.12, count: 25 },  // South-central
+    { cx: 0.25, cy: 0.55, radius: 0.10, count: 15 },  // Northwest
+    { cx: 0.75, cy: 0.60, radius: 0.10, count: 14 }   // Northeast
+  ];
 
-    // Base position in grid
-    const baseX = col * cellSize + cellSize / 2;
-    const baseY = row * cellSize + cellSize / 2;
+  // Generate stations in clusters
+  for (const cluster of clusters) {
+    for (let i = 0; i < cluster.count; i++) {
+      // Random angle and distance from cluster center
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = Math.random() * cluster.radius;
 
-    // Add slight randomization (±25% of cell size) to avoid perfect grid
-    // This makes the layout look more like a real city street network
-    const randomX = (Math.random() - 0.5) * cellSize * 0.5;
-    const randomY = (Math.random() - 0.5) * cellSize * 0.5;
+      const x = cluster.cx + Math.cos(angle) * distance;
+      const y = cluster.cy + Math.sin(angle) * distance;
 
-    stations.push({
-      x: Math.max(0.05, Math.min(0.95, baseX + randomX)),
-      y: Math.max(0.05, Math.min(0.95, baseY + randomY))
-    });
+      // Keep within bounds (0.05 to 0.95)
+      stations.push({
+        x: Math.max(0.05, Math.min(0.95, x)),
+        y: Math.max(0.05, Math.min(0.95, y))
+      });
+    }
   }
 
   return stations;
@@ -42,14 +48,14 @@ function generateStationGrid() {
 export const SCOTLAND_YARD_TEMPLATE = {
   id: 'classic',
   name: 'Classic Scotland Yard',
-  description: 'Original board game layout with 199 stations across the city',
+  description: 'Authentic board game layout: 199 stations in organic clustered pattern',
   stationCount: 199,
 
   // Relative positions (0-1 range for both x and y)
   // x: 0 = west edge, 1 = east edge
   // y: 0 = south edge, 1 = north edge
-  // Generated to cover the entire game area evenly like the original board
-  stations: generateStationGrid()
+  // Pattern matches real game: dense center, sparse edges, multiple hubs
+  stations: generateScotlandYardLayout()
 };
 
 /**

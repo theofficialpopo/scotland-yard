@@ -26,9 +26,17 @@ export async function generateGameBoardFromBounds(bounds, center, address) {
     const templateCoordinates = scaleStationsToBox(bounds);
     console.log(`Placed ${templateCoordinates.length} template stations`);
 
-    // Step 2: Snap each station to nearest road
-    console.log('\n🔧 Step 2: Snapping stations to actual roads...');
-    const snappedCoordinates = await snapMultipleToRoads(templateCoordinates, 150);
+    // Step 2: TEMPORARILY DISABLED - Snap each station to nearest road
+    console.log('\n⚠️ Step 2: Road snapping DISABLED for layout testing...');
+    // const snappedCoordinates = await snapMultipleToRoads(templateCoordinates, 150);
+
+    // Use template coordinates directly without snapping (for testing layout)
+    const snappedCoordinates = templateCoordinates.map(coord => ({
+      ...coord,
+      roadName: null,
+      distance: 0,
+      snapped: false
+    }));
 
     // Step 3: Reverse geocode each station to get street names
     console.log('\n🔍 Step 3: Finding street names for stations...');
