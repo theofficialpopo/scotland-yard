@@ -41,113 +41,106 @@ function calculateDistance(lng1, lat1, lng2, lat2) {
 /**
  * Assign station types based on real transit data + template fallback
  * Implements authentic Scotland Yard ratios: 20 underground, 80 bus, 99 taxi-only
+ * Uses real station coordinates when available
  */
-function assignStationTypes(templateStations, transitData) {
+function assignStationTypes(templateStations, transitData, center) {
   console.log('\n🎯 Assigning station types with authentic Scotland Yard ratios...');
   console.log(`   Target: ${SCOTLAND_YARD_RATIOS.underground} underground, ${SCOTLAND_YARD_RATIOS.bus} bus, ${SCOTLAND_YARD_RATIOS.taxiOnly} taxi-only`);
 
   const stationsWithTypes = [];
   const { underground: realUnderground, bus: realBus } = transitData;
 
-  // Step 1: Assign underground stations (first 20 template positions)
+  // Calculate distances from center and sort
+  const undergroundWithDistance = realUnderground.map(station => ({
+    ...station,
+    distanceFromCenter: calculateDistance(
+      center.lng,
+      center.lat,
+      station.coordinates[0],
+      station.coordinates[1]
+    )
+  })).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+
+  const busWithDistance = realBus.map(station => ({
+    ...station,
+    distanceFromCenter: calculateDistance(
+      center.lng,
+      center.lat,
+      station.coordinates[0],
+      station.coordinates[1]
+    )
+  })).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+
+  // Step 1: Assign underground stations (20 total)
   console.log('\n📍 Step 1: Assigning UNDERGROUND stations (20 total)...');
-  for (let i = 0; i < SCOTLAND_YARD_RATIOS.underground; i++) {
+  const numRealUnderground = Math.min(SCOTLAND_YARD_RATIOS.underground, undergroundWithDistance.length);
+
+  // Use real underground stations (sorted by proximity)
+  for (let i = 0; i < numRealUnderground; i++) {
+    const station = undergroundWithDistance[i];
+    stationsWithTypes.push({
+      id: i + 1,
+      name: station.name,
+      coordinates: station.coordinates,
+      types: ['taxi', 'bus', 'underground'],
+      realTransit: true,
+      distanceFromCenter: Math.round(station.distanceFromCenter)
+    });
+    console.log(`   ✅ Station ${i + 1}: "${station.name}" (${Math.round(station.distanceFromCenter)}m from center)`);
+  }
+
+  // Fill remaining with template positions
+  for (let i = numRealUnderground; i < SCOTLAND_YARD_RATIOS.underground; i++) {
     const templateStation = templateStations[i];
+    stationsWithTypes.push({
+      id: i + 1,
+      name: `Underground Station ${i + 1}`,
+      coordinates: [templateStation.lng, templateStation.lat],
+      types: ['taxi', 'bus', 'underground'],
+      realTransit: false,
+      distanceFromCenter: 0
+    });
+    console.log(`   ⚠️ Station ${i + 1}: Using template position (no real station available)`);
+  }
 
-    // Try to find closest real underground station
-    let closestUnderground = null;
-    let minDistance = Infinity;
+  // Step 2: Assign bus stations (80 total)
+  console.log('\n🚌 Step 2: Assigning BUS stations (80 total)...');
+  const numRealBus = Math.min(SCOTLAND_YARD_RATIOS.bus, busWithDistance.length);
 
-    for (const realStation of realUnderground) {
-      const distance = calculateDistance(
-        templateStation.lng,
-        templateStation.lat,
-        realStation.coordinates[0],
-        realStation.coordinates[1]
-      );
+  // Use real bus stops (sorted by proximity)
+  for (let i = 0; i < numRealBus; i++) {
+    const station = busWithDistance[i];
+    const stationId = SCOTLAND_YARD_RATIOS.underground + i + 1;
+    stationsWithTypes.push({
+      id: stationId,
+      name: station.name,
+      coordinates: station.coordinates,
+      types: ['taxi', 'bus'],
+      realTransit: true,
+      distanceFromCenter: Math.round(station.distanceFromCenter)
+    });
 
-      if (distance < minDistance && distance < 1000) { // Within 1km
-        minDistance = distance;
-        closestUnderground = realStation;
-      }
-    }
-
-    if (closestUnderground) {
-      // Use real underground station
-      stationsWithTypes.push({
-        id: i + 1,
-        name: closestUnderground.name,
-        coordinates: closestUnderground.coordinates,
-        types: ['taxi', 'bus', 'underground'],
-        realTransit: true,
-        matchDistance: Math.round(minDistance)
-      });
-      console.log(`   ✅ Station ${i + 1}: Matched to real underground "${closestUnderground.name}" (${Math.round(minDistance)}m)`);
-    } else {
-      // Use template position (fallback)
-      stationsWithTypes.push({
-        id: i + 1,
-        name: `Underground Station ${i + 1}`,
-        coordinates: [templateStation.lng, templateStation.lat],
-        types: ['taxi', 'bus', 'underground'],
-        realTransit: false,
-        matchDistance: 0
-      });
-      console.log(`   ⚠️ Station ${i + 1}: No real underground nearby, using template position`);
+    if (i < 5) {
+      console.log(`   ✅ Station ${stationId}: "${station.name}" (${Math.round(station.distanceFromCenter)}m from center)`);
     }
   }
 
-  // Step 2: Assign bus stations (next 80 template positions)
-  console.log('\n🚌 Step 2: Assigning BUS stations (80 total)...');
-  for (let i = SCOTLAND_YARD_RATIOS.underground; i < SCOTLAND_YARD_RATIOS.underground + SCOTLAND_YARD_RATIOS.bus; i++) {
-    const templateStation = templateStations[i];
+  // Fill remaining with template positions
+  for (let i = numRealBus; i < SCOTLAND_YARD_RATIOS.bus; i++) {
+    const templateIdx = SCOTLAND_YARD_RATIOS.underground + i;
+    const stationId = templateIdx + 1;
+    const templateStation = templateStations[templateIdx];
+    stationsWithTypes.push({
+      id: stationId,
+      name: `Bus Station ${stationId}`,
+      coordinates: [templateStation.lng, templateStation.lat],
+      types: ['taxi', 'bus'],
+      realTransit: false,
+      distanceFromCenter: 0
+    });
 
-    // Try to find closest real bus stop
-    let closestBus = null;
-    let minDistance = Infinity;
-
-    for (const realStation of realBus) {
-      const distance = calculateDistance(
-        templateStation.lng,
-        templateStation.lat,
-        realStation.coordinates[0],
-        realStation.coordinates[1]
-      );
-
-      if (distance < minDistance && distance < 500) { // Within 500m
-        minDistance = distance;
-        closestBus = realStation;
-      }
-    }
-
-    if (closestBus) {
-      // Use real bus stop
-      stationsWithTypes.push({
-        id: i + 1,
-        name: closestBus.name,
-        coordinates: closestBus.coordinates,
-        types: ['taxi', 'bus'],
-        realTransit: true,
-        matchDistance: Math.round(minDistance)
-      });
-
-      if (i < SCOTLAND_YARD_RATIOS.underground + 5) {
-        console.log(`   ✅ Station ${i + 1}: Matched to real bus stop "${closestBus.name}" (${Math.round(minDistance)}m)`);
-      }
-    } else {
-      // Use template position (fallback)
-      stationsWithTypes.push({
-        id: i + 1,
-        name: `Bus Station ${i + 1}`,
-        coordinates: [templateStation.lng, templateStation.lat],
-        types: ['taxi', 'bus'],
-        realTransit: false,
-        matchDistance: 0
-      });
-
-      if (i < SCOTLAND_YARD_RATIOS.underground + 5) {
-        console.log(`   ⚠️ Station ${i + 1}: No real bus stop nearby, using template position`);
-      }
+    if (i < 5) {
+      console.log(`   ⚠️ Station ${stationId}: Using template position (no real station available)`);
     }
   }
 
@@ -164,7 +157,7 @@ function assignStationTypes(templateStations, transitData) {
       coordinates: [templateStation.lng, templateStation.lat],
       types: ['taxi'],
       realTransit: false,
-      matchDistance: 0
+      distanceFromCenter: 0
     });
   }
   console.log(`   ✅ Assigned 99 taxi-only stations (template positions)`);
@@ -218,9 +211,42 @@ export async function generateGameBoardFromBounds(bounds, center, address) {
     console.log(`   Placed ${templateCoordinates.length} template stations`);
 
     // Step 3: Assign station types (underground/bus/taxi) using authentic ratios
-    const stationsWithTypes = assignStationTypes(templateCoordinates, transitData);
+    const stationsWithTypes = assignStationTypes(templateCoordinates, transitData, center);
 
-    // Step 4: Create game board configuration
+    // Step 4: Snap real transit stations to roads for accurate placement
+    console.log('\n🛣️ Step 4: Snapping real transit stations to roads...');
+    const realTransitStations = stationsWithTypes.filter(s => s.realTransit);
+
+    if (realTransitStations.length > 0) {
+      console.log(`   Snapping ${realTransitStations.length} real transit stations to nearest roads...`);
+
+      // Snap to roads
+      const snappedStations = await snapMultipleToRoads(
+        realTransitStations.map(s => s.coordinates),
+        50 // 50m snap radius
+      );
+
+      // Update coordinates with snapped positions
+      let snappedCount = 0;
+      realTransitStations.forEach((station, idx) => {
+        const snapped = snappedStations[idx];
+        if (snapped && snapped.snapped) {
+          // Find station in main array and update coordinates
+          const stationInArray = stationsWithTypes.find(s => s.id === station.id);
+          if (stationInArray) {
+            stationInArray.coordinates = snapped.coordinates;
+            stationInArray.snappedToRoad = true;
+            snappedCount++;
+          }
+        }
+      });
+
+      console.log(`   ✅ Snapped ${snappedCount}/${realTransitStations.length} stations to roads`);
+    } else {
+      console.log(`   ⚠️ No real transit stations to snap`);
+    }
+
+    // Step 5: Create game board configuration
     const gameBoard = {
       address: address,
       center: center,
