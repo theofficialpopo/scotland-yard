@@ -402,59 +402,153 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
   console.log('\n🚌 Query 2: Fetching BUS stops from OpenStreetMap...');
   const osmBusResult = await fetchBusStopsFromOSM(center.lng, center.lat, radiusMeters);
 
-  // Process results
-  const undergroundStations = [];
+  // Process results with intelligent classification
+  const realUnderground = []; // Real subway/metro/major train stations
+  const lightRail = []; // Light rail and minor stations
+  const tramStops = []; // Tram stops (NOT underground)
   const busStations = [];
   const seenIds = new Set();
 
-  console.log('\n🔍 Processing rail/train/metro/tram stations from OSM...');
+  console.log('\n🔍 Processing and classifying rail/train/metro/tram stations from OSM...');
 
-  // Process OSM rail stations
+  /**
+   * Calculate quality score for a station
+   * Higher score = more important station (better for game)
+   */
+  function calculateStationQuality(tags) {
+    let score = 0;
+
+    // Station type scoring
+    if (tags.station === 'subway') score += 100; // Real subway/metro
+    if (tags.railway === 'station') score += 80; // Major train station
+    if (tags.station === 'light_rail') score += 40; // Light rail
+    if (tags.railway === 'halt') score += 20; // Small train stop
+    if (tags.railway === 'tram_stop') score += 5; // Tram stop (lowest priority)
+
+    // Additional quality indicators
+    if (tags.operator) score += 10; // Has operator = more official
+    if (tags.network) score += 5; // Part of network = more important
+    if (tags.public_transport === 'station') score += 10; // Official transit station
+
+    return score;
+  }
+
+  // Process OSM rail stations with classification
   osmRailResult.features.forEach(element => {
     const tags = element.tags || {};
     const name = tags.name || 'Unnamed Station';
     const coords = [element.lon, element.lat];
     const featureId = `${coords[0]}_${coords[1]}_${name}`;
 
-    // Skip duplicates
+    // Skip duplicates by exact coordinates
     if (seenIds.has(featureId)) return;
     seenIds.add(featureId);
+
+    const qualityScore = calculateStationQuality(tags);
 
     const station = {
       id: featureId,
       name: name,
       coordinates: coords,
-      mode: 'rail', // All from rail query are rail/train/metro/tram
+      mode: 'rail',
       railwayType: tags.railway,
       stationType: tags.station,
       operator: tags.operator,
-      network: tags.network
+      network: tags.network,
+      qualityScore: qualityScore
     };
 
-    undergroundStations.push(station);
-
-    // Log first 10 stations
-    if (undergroundStations.length <= 10) {
-      console.log(`   ✅ Found rail station: "${name}" (${tags.railway || tags.station || 'unknown type'})`);
+    // Classify by station importance
+    // Priority 1: Real subway/metro stations
+    if (tags.station === 'subway' || (tags.railway === 'station' && tags.subway === 'yes')) {
+      realUnderground.push(station);
+      if (realUnderground.length <= 10) {
+        console.log(`   🚇 UNDERGROUND: "${name}" (subway/metro) [score: ${qualityScore}]`);
+      }
+    }
+    // Priority 2: Major train stations
+    else if (tags.railway === 'station') {
+      realUnderground.push(station);
+      if (realUnderground.length <= 10) {
+        console.log(`   🚂 UNDERGROUND: "${name}" (train station) [score: ${qualityScore}]`);
+      }
+    }
+    // Priority 3: Light rail and small stops
+    else if (tags.station === 'light_rail' || tags.railway === 'halt') {
+      lightRail.push(station);
+      if (lightRail.length <= 5) {
+        console.log(`   🚊 LIGHT RAIL: "${name}" (${tags.railway || tags.station}) [score: ${qualityScore}]`);
+      }
+    }
+    // Exclude: Tram stops (NOT suitable for underground category)
+    else if (tags.railway === 'tram_stop') {
+      tramStops.push(station);
+      if (tramStops.length <= 5) {
+        console.log(`   🚋 TRAM STOP: "${name}" (excluding from underground) [score: ${qualityScore}]`);
+      }
+    }
+    // Default: Treat as light rail
+    else {
+      lightRail.push(station);
     }
   });
 
-  if (undergroundStations.length > 10) {
-    console.log(`   ... and ${undergroundStations.length - 10} more rail stations`);
+  console.log(`\n📊 Classification results:`);
+  console.log(`   - Real underground/major stations: ${realUnderground.length}`);
+  console.log(`   - Light rail/minor stations: ${lightRail.length}`);
+  console.log(`   - Tram stops (excluded): ${tramStops.length}`);
+
+  // Combine real underground with light rail as fallback
+  const allUndergroundCandidates = [...realUnderground, ...lightRail];
+  console.log(`   - Total candidates for underground: ${allUndergroundCandidates.length}`);
+
+  // Deduplicate by station name (keep highest quality score)
+  console.log('\n🔍 Deduplicating stations by name...');
+  const stationsByName = new Map();
+
+  allUndergroundCandidates.forEach(station => {
+    const existing = stationsByName.get(station.name);
+    if (!existing || station.qualityScore > existing.qualityScore) {
+      stationsByName.set(station.name, station);
+    }
+  });
+
+  const undergroundStations = Array.from(stationsByName.values());
+  const duplicatesRemoved = allUndergroundCandidates.length - undergroundStations.length;
+
+  console.log(`   - Removed ${duplicatesRemoved} duplicate station names`);
+  console.log(`   - Final unique underground stations: ${undergroundStations.length}`);
+
+  if (duplicatesRemoved > 0) {
+    console.log(`   - Examples of removed duplicates:`);
+    const allNames = allUndergroundCandidates.map(s => s.name);
+    const duplicateNames = allNames.filter((name, i) => allNames.indexOf(name) !== i);
+    const uniqueDuplicateNames = [...new Set(duplicateNames)].slice(0, 5);
+    uniqueDuplicateNames.forEach(name => {
+      console.log(`     ⚠️ "${name}" had multiple entries (kept best quality)`);
+    });
   }
 
   console.log('\n🔍 Processing bus stops from OSM...');
 
-  // Process OSM bus stops
+  // Process OSM bus stops (with quality scoring for consistency)
+  const allBusCandidates = [];
+
   osmBusResult.features.forEach(element => {
     const tags = element.tags || {};
     const name = tags.name || 'Unnamed Bus Stop';
     const coords = [element.lon, element.lat];
     const featureId = `${coords[0]}_${coords[1]}_${name}`;
 
-    // Skip duplicates
+    // Skip duplicates by exact coordinates
     if (seenIds.has(featureId)) return;
     seenIds.add(featureId);
+
+    // Quality score for bus stops
+    let qualityScore = 10; // Base score
+    if (tags.operator) qualityScore += 5;
+    if (tags.network) qualityScore += 3;
+    if (tags.shelter === 'yes') qualityScore += 2; // Has shelter = more official
 
     const station = {
       id: featureId,
@@ -462,20 +556,51 @@ export async function fetchTransitStationsForGameBoard(bounds, center) {
       coordinates: coords,
       mode: 'bus',
       operator: tags.operator,
-      network: tags.network
+      network: tags.network,
+      qualityScore: qualityScore
     };
 
-    busStations.push(station);
+    allBusCandidates.push(station);
 
     // Log first 10 stations
-    if (busStations.length <= 10) {
-      console.log(`   ✅ Found bus stop: "${name}"`);
+    if (allBusCandidates.length <= 10) {
+      console.log(`   🚌 BUS STOP: "${name}" [score: ${qualityScore}]`);
     }
   });
 
-  if (busStations.length > 10) {
-    console.log(`   ... and ${busStations.length - 10} more bus stops`);
+  if (allBusCandidates.length > 10) {
+    console.log(`   ... and ${allBusCandidates.length - 10} more bus stops`);
   }
+
+  // Deduplicate bus stops by name (keep highest quality score)
+  console.log('\n🔍 Deduplicating bus stops by name...');
+  const busStopsByName = new Map();
+
+  allBusCandidates.forEach(station => {
+    const existing = busStopsByName.get(station.name);
+    if (!existing || station.qualityScore > existing.qualityScore) {
+      busStopsByName.set(station.name, station);
+    }
+  });
+
+  const uniqueBusStops = Array.from(busStopsByName.values());
+  const busDuplicatesRemoved = allBusCandidates.length - uniqueBusStops.length;
+
+  console.log(`   - Removed ${busDuplicatesRemoved} duplicate bus stop names`);
+  console.log(`   - Final unique bus stops: ${uniqueBusStops.length}`);
+
+  if (busDuplicatesRemoved > 0) {
+    console.log(`   - Examples of removed duplicates:`);
+    const allBusNames = allBusCandidates.map(s => s.name);
+    const duplicateBusNames = allBusNames.filter((name, i) => allBusNames.indexOf(name) !== i);
+    const uniqueDuplicateBusNames = [...new Set(duplicateBusNames)].slice(0, 5);
+    uniqueDuplicateBusNames.forEach(name => {
+      console.log(`     ⚠️ "${name}" had multiple entries (kept best quality)`);
+    });
+  }
+
+  // Use deduplicated bus stops
+  busStations.push(...uniqueBusStops);
 
   console.log(`\n✅ Processed ${undergroundStations.length} rail/train/metro/tram stations (from OSM)`);
   console.log(`✅ Processed ${busStations.length} bus stops (from OSM)`);

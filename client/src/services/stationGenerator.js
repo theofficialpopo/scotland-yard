@@ -39,9 +39,105 @@ function calculateDistance(lng1, lat1, lng2, lat2) {
 }
 
 /**
+ * Select stations with spatial distribution across game area
+ * Instead of just taking closest stations, distribute them across quadrants
+ *
+ * @param {Array} stations - Stations with coordinates and quality scores
+ * @param {Object} center - Center point {lng, lat}
+ * @param {number} targetCount - How many stations to select
+ * @returns {Array} Selected stations distributed across game area
+ */
+function selectStationsWithDistribution(stations, center, targetCount) {
+  if (stations.length <= targetCount) {
+    return stations; // Use all available stations
+  }
+
+  console.log(`\n📐 Distributing ${targetCount} stations across game area...`);
+
+  // Add distance and classify into quadrants
+  const stationsWithMetadata = stations.map(station => {
+    const lng = station.coordinates[0];
+    const lat = station.coordinates[1];
+    const distance = calculateDistance(center.lng, center.lat, lng, lat);
+
+    // Determine quadrant (NW, NE, SW, SE) relative to center
+    const isNorth = lat >= center.lat;
+    const isEast = lng >= center.lng;
+    const quadrant = `${isNorth ? 'N' : 'S'}${isEast ? 'E' : 'W'}`;
+
+    return {
+      ...station,
+      distanceFromCenter: distance,
+      quadrant: quadrant,
+      lng: lng,
+      lat: lat
+    };
+  });
+
+  // Group stations by quadrant
+  const byQuadrant = {
+    NE: stationsWithMetadata.filter(s => s.quadrant === 'NE'),
+    NW: stationsWithMetadata.filter(s => s.quadrant === 'NW'),
+    SE: stationsWithMetadata.filter(s => s.quadrant === 'SE'),
+    SW: stationsWithMetadata.filter(s => s.quadrant === 'SW')
+  };
+
+  console.log(`   - Quadrant distribution:`);
+  console.log(`     NE: ${byQuadrant.NE.length} | NW: ${byQuadrant.NW.length}`);
+  console.log(`     SE: ${byQuadrant.SE.length} | SW: ${byQuadrant.SW.length}`);
+
+  // Calculate how many to take from each quadrant (proportional to availability)
+  const quadrants = ['NE', 'NW', 'SE', 'SW'];
+  const totalAvailable = stations.length;
+  const perQuadrantTarget = Math.ceil(targetCount / 4);
+
+  const selected = [];
+
+  // First pass: Select evenly from each quadrant (sorted by quality + distance)
+  for (const quad of quadrants) {
+    const quadStations = byQuadrant[quad];
+    if (quadStations.length === 0) continue;
+
+    // Sort by quality score (descending) then distance (ascending)
+    // This prioritizes high-quality nearby stations in each quadrant
+    quadStations.sort((a, b) => {
+      const qualityDiff = (b.qualityScore || 0) - (a.qualityScore || 0);
+      if (qualityDiff !== 0) return qualityDiff;
+      return a.distanceFromCenter - b.distanceFromCenter;
+    });
+
+    // Take best stations from this quadrant
+    const toTake = Math.min(perQuadrantTarget, quadStations.length);
+    selected.push(...quadStations.slice(0, toTake));
+  }
+
+  // Second pass: If we need more stations, take the best remaining by quality
+  if (selected.length < targetCount) {
+    const remaining = stationsWithMetadata
+      .filter(s => !selected.includes(s))
+      .sort((a, b) => {
+        const qualityDiff = (b.qualityScore || 0) - (a.qualityScore || 0);
+        if (qualityDiff !== 0) return qualityDiff;
+        return a.distanceFromCenter - b.distanceFromCenter;
+      });
+
+    const needed = targetCount - selected.length;
+    selected.push(...remaining.slice(0, needed));
+  }
+
+  // Sort final selection by distance for logging purposes
+  selected.sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+
+  console.log(`   - Selected ${selected.length} stations distributed across quadrants`);
+  console.log(`   - Distance range: ${Math.round(selected[0].distanceFromCenter)}m - ${Math.round(selected[selected.length - 1].distanceFromCenter)}m`);
+
+  return selected;
+}
+
+/**
  * Assign station types based on real transit data + template fallback
  * Implements authentic Scotland Yard ratios: 20 underground, 80 bus, 99 taxi-only
- * Uses real station coordinates when available
+ * Uses real station coordinates when available with spatial distribution
  */
 function assignStationTypes(templateStations, transitData, center) {
   console.log('\n🎯 Assigning station types with authentic Scotland Yard ratios...');
@@ -50,26 +146,18 @@ function assignStationTypes(templateStations, transitData, center) {
   const stationsWithTypes = [];
   const { underground: realUnderground, bus: realBus } = transitData;
 
-  // Calculate distances from center and sort
-  const undergroundWithDistance = realUnderground.map(station => ({
-    ...station,
-    distanceFromCenter: calculateDistance(
-      center.lng,
-      center.lat,
-      station.coordinates[0],
-      station.coordinates[1]
-    )
-  })).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+  // Use spatial distribution instead of pure proximity
+  const undergroundWithDistance = selectStationsWithDistribution(
+    realUnderground,
+    center,
+    SCOTLAND_YARD_RATIOS.underground
+  );
 
-  const busWithDistance = realBus.map(station => ({
-    ...station,
-    distanceFromCenter: calculateDistance(
-      center.lng,
-      center.lat,
-      station.coordinates[0],
-      station.coordinates[1]
-    )
-  })).sort((a, b) => a.distanceFromCenter - b.distanceFromCenter);
+  const busWithDistance = selectStationsWithDistribution(
+    realBus,
+    center,
+    SCOTLAND_YARD_RATIOS.bus
+  );
 
   // Step 1: Assign underground stations (20 total)
   console.log('\n📍 Step 1: Assigning UNDERGROUND stations (20 total)...');
