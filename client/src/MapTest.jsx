@@ -207,10 +207,10 @@ function MapTest() {
             <strong style={{ color: '#FFD700' }}>{gameBoard.stations.length}</strong> stations
           </span>
           <span>
-            <strong style={{ color: '#FFD700' }}>{gameBoard.metadata.intersectionCount}</strong> intersections analyzed
+            Template: <strong style={{ color: '#FFD700' }}>Classic Scotland Yard</strong>
           </span>
           <span>
-            Area type: <strong style={{ color: '#FFD700' }}>{gameBoard.metadata.areaTypeDetails.name}</strong>
+            Generated: <strong style={{ color: '#FFD700' }}>{new Date(gameBoard.metadata.generatedAt).toLocaleTimeString()}</strong>
           </span>
         </div>
       </div>
@@ -261,7 +261,7 @@ function MapTest() {
                 color: '#FFD700',
                 marginBottom: '4px'
               }}>
-                #{station.id} - {station.roadCount} roads
+                #{station.id}
               </div>
               <div style={{
                 fontSize: '11px',

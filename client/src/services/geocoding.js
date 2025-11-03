@@ -1,8 +1,7 @@
 /**
  * Geocoding Service
  *
- * Converts addresses to coordinates using Mapbox Geocoding API
- * and classifies area density for intelligent station generation
+ * Handles forward and reverse geocoding using Mapbox Geocoding API
  */
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
@@ -227,4 +226,63 @@ export function calculateBounds(lng, lat, radiusMeters) {
     [lng - lngDelta, lat - latDelta],  // Southwest
     [lng + lngDelta, lat + latDelta]   // Northeast
   ];
+}
+
+/**
+ * Reverse geocode coordinates to get street name and address
+ *
+ * @param {number} lng - Longitude
+ * @param {number} lat - Latitude
+ * @returns {Promise<Object>} Street information
+ */
+export async function reverseGeocode(lng, lat) {
+  if (!MAPBOX_TOKEN || MAPBOX_TOKEN === 'your_mapbox_token_here') {
+    throw new Error('Mapbox token not configured');
+  }
+
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=address&limit=1`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Reverse geocoding failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.features || data.features.length === 0) {
+      // No address found, return default
+      return {
+        streetName: null,
+        fullAddress: null,
+        neighborhood: null
+      };
+    }
+
+    const feature = data.features[0];
+    const context = feature.context || [];
+
+    // Extract street name (use "text" field which is the street name)
+    const streetName = feature.text || null;
+
+    // Extract neighborhood
+    let neighborhood = null;
+    for (const ctx of context) {
+      if (ctx.id.startsWith('locality') || ctx.id.startsWith('neighborhood')) {
+        neighborhood = ctx.text;
+        break;
+      }
+    }
+
+    return {
+      streetName: streetName,
+      fullAddress: feature.place_name,
+      neighborhood: neighborhood
+    };
+
+  } catch (error) {
+    console.error('Reverse geocoding error:', error);
+    throw error;
+  }
 }
