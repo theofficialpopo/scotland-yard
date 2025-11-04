@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Marker } from 'react-map-gl';
 import AddressInput from './components/AddressInput';
 import MapDisplay from './components/MapDisplay';
+import StationSymbol, { getStationSymbol } from './components/StationSymbol';
 import { geocodeAddress } from './services/geocoding';
 import { generateGameBoardFromBounds } from './services/stationGenerator';
 import { researchTransitAvailability, fetchTransitStationsForGameBoard } from './services/transitDataFetcher';
@@ -21,6 +22,7 @@ function MapTest() {
   const [locationData, setLocationData] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [researching, setResearching] = useState(false);
+  const [hoveredStation, setHoveredStation] = useState(null);
   const mapRef = useRef(null);
 
   const handleAddressSubmit = async (address) => {
@@ -132,39 +134,7 @@ function MapTest() {
     console.log('Map loaded successfully');
   };
 
-  /**
-   * Get marker style based on station types
-   * Underground (red), Bus (green), Taxi-only (yellow)
-   */
-  const getStationStyle = (station) => {
-    const types = station.types || ['taxi'];
-
-    if (types.includes('underground')) {
-      return {
-        backgroundColor: '#FF0000',  // Red
-        size: 14,
-        icon: '🚇',
-        border: '3px solid #CC0000',
-        zIndex: 30
-      };
-    } else if (types.includes('bus')) {
-      return {
-        backgroundColor: '#00CC00',  // Green
-        size: 11,
-        icon: '🚌',
-        border: '2px solid #009900',
-        zIndex: 20
-      };
-    } else {
-      return {
-        backgroundColor: '#FFD700',  // Yellow/Gold
-        size: 9,
-        icon: '🚕',
-        border: '2px solid #CCAA00',
-        zIndex: 10
-      };
-    }
-  };
+  // Get station symbol configuration (moved to StationSymbol component)
 
   // Address input view
   if (!showMap || !locationData) {
@@ -240,49 +210,28 @@ function MapTest() {
         onMapLoad={handleMapLoad}
         generatedCenter={locationData.center}
       >
-        {/* Station Markers (only if game board exists) */}
+        {/* Station Markers with authentic Scotland Yard symbols */}
         {gameBoard && gameBoard.stations.map((station) => {
-          const style = getStationStyle(station);
+          const symbol = getStationSymbol(station.types || ['taxi']);
+          const isHovered = hoveredStation === station.id;
+
           return (
             <Marker
               key={station.id}
               longitude={station.coordinates[0]}
               latitude={station.coordinates[1]}
             >
-              <div style={{
-                background: style.backgroundColor,
-                border: style.border,
-                borderRadius: '50%',
-                width: `${style.size * 2.5}px`,
-                height: `${style.size * 2.5}px`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: `${style.size}px`,
-                fontWeight: 'bold',
-                color: '#FFFFFF',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                zIndex: style.zIndex,
-                position: 'relative'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.4)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.7)';
-                e.currentTarget.style.zIndex = '100';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)';
-                e.currentTarget.style.zIndex = style.zIndex;
-              }}
-              title={`Station ${station.id}: ${station.name}\nTypes: ${station.types.join(', ').toUpperCase()}`}
-            >
-              <span style={{ fontSize: `${Math.max(style.size - 3, 8)}px`, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
-                {station.id}
-              </span>
-            </div>
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: isHovered ? 100 : symbol.zIndex
+                }}
+                onMouseEnter={() => setHoveredStation(station.id)}
+                onMouseLeave={() => setHoveredStation(null)}
+                title={`Station ${station.id}: ${station.name}\n${symbol.label}`}
+              >
+                <StationSymbol station={station} isHovered={isHovered} />
+              </div>
             </Marker>
           );
         })}

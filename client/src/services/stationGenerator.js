@@ -45,14 +45,18 @@ function calculateDistance(lng1, lat1, lng2, lat2) {
  * @param {Array} stations - Stations with coordinates and quality scores
  * @param {Object} center - Center point {lng, lat}
  * @param {number} targetCount - How many stations to select
+ * @param {number} minDistanceMeters - Minimum distance between stations (optional, for underground)
  * @returns {Array} Selected stations distributed across game area
  */
-function selectStationsWithDistribution(stations, center, targetCount) {
+function selectStationsWithDistribution(stations, center, targetCount, minDistanceMeters = 0) {
   if (stations.length <= targetCount) {
     return stations; // Use all available stations
   }
 
   console.log(`\n📐 Distributing ${targetCount} stations across game area...`);
+  if (minDistanceMeters > 0) {
+    console.log(`   - Minimum distance filter: ${minDistanceMeters}m (ensures longer-distance travel)`);
+  }
 
   // Add distance and classify into quadrants
   const stationsWithMetadata = stations.map(station => {
@@ -93,7 +97,26 @@ function selectStationsWithDistribution(stations, center, targetCount) {
 
   const selected = [];
 
+  /**
+   * Check if a station is far enough from all already-selected stations
+   */
+  function isFarEnoughFromSelected(station) {
+    if (minDistanceMeters === 0) return true; // No minimum distance requirement
+
+    for (const selectedStation of selected) {
+      const distance = calculateDistance(
+        station.lng, station.lat,
+        selectedStation.lng, selectedStation.lat
+      );
+      if (distance < minDistanceMeters) {
+        return false; // Too close to an already-selected station
+      }
+    }
+    return true;
+  }
+
   // First pass: Select evenly from each quadrant (sorted by quality + distance)
+  // With minimum distance filtering for underground stations
   for (const quad of quadrants) {
     const quadStations = byQuadrant[quad];
     if (quadStations.length === 0) continue;
@@ -106,12 +129,22 @@ function selectStationsWithDistribution(stations, center, targetCount) {
       return a.distanceFromCenter - b.distanceFromCenter;
     });
 
-    // Take best stations from this quadrant
+    // Take best stations from this quadrant, respecting minimum distance
     const toTake = Math.min(perQuadrantTarget, quadStations.length);
-    selected.push(...quadStations.slice(0, toTake));
+    let taken = 0;
+
+    for (const station of quadStations) {
+      if (taken >= toTake) break;
+
+      if (isFarEnoughFromSelected(station)) {
+        selected.push(station);
+        taken++;
+      }
+    }
   }
 
   // Second pass: If we need more stations, take the best remaining by quality
+  // Also respecting minimum distance filter
   if (selected.length < targetCount) {
     const remaining = stationsWithMetadata
       .filter(s => !selected.includes(s))
@@ -122,7 +155,20 @@ function selectStationsWithDistribution(stations, center, targetCount) {
       });
 
     const needed = targetCount - selected.length;
-    selected.push(...remaining.slice(0, needed));
+
+    // Take additional stations, respecting minimum distance
+    for (const station of remaining) {
+      if (selected.length >= targetCount) break;
+
+      if (isFarEnoughFromSelected(station)) {
+        selected.push(station);
+      }
+    }
+
+    // Log if we couldn't meet target due to minimum distance constraints
+    if (selected.length < targetCount && minDistanceMeters > 0) {
+      console.log(`   ⚠️ Could only select ${selected.length}/${targetCount} stations (${targetCount - selected.length} filtered by ${minDistanceMeters}m minimum distance)`);
+    }
   }
 
   // Sort final selection by distance for logging purposes
@@ -146,17 +192,26 @@ function assignStationTypes(templateStations, transitData, center) {
   const stationsWithTypes = [];
   const { underground: realUnderground, bus: realBus } = transitData;
 
-  // Use spatial distribution instead of pure proximity
+  // Use spatial distribution with minimum distance filtering
+  // Underground stations: 700m minimum distance ensures strategic long-distance travel
+  const UNDERGROUND_MIN_DISTANCE = 700; // meters - prevents stations too close together
+
+  console.log(`\n🚂 Underground Strategy: Selecting stations with ${UNDERGROUND_MIN_DISTANCE}m minimum spacing`);
+  console.log(`   This ensures underground travel is for longer distances, not short hops`);
+
   const undergroundWithDistance = selectStationsWithDistribution(
     realUnderground,
     center,
-    SCOTLAND_YARD_RATIOS.underground
+    SCOTLAND_YARD_RATIOS.underground,
+    UNDERGROUND_MIN_DISTANCE // Apply minimum distance filter
   );
 
+  // Bus stations: No minimum distance (can be closer together)
   const busWithDistance = selectStationsWithDistribution(
     realBus,
     center,
-    SCOTLAND_YARD_RATIOS.bus
+    SCOTLAND_YARD_RATIOS.bus,
+    0 // No minimum distance for bus stops
   );
 
   // Step 1: Assign underground stations (20 total)
