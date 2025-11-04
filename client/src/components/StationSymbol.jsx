@@ -3,7 +3,19 @@
  *
  * Renders authentic Scotland Yard station symbols using SVG
  * Based on the classic Ravensburger board game design
+ *
+ * Symbol structure:
+ * - Top: Semicircle (colored by available modes)
+ * - Bottom: Rectangle (colored by available modes)
+ * - Station number in center
  */
+
+// Scotland Yard authentic colors
+const COLORS = {
+  TAXI: '#F9D71C',      // Yellow for taxi
+  BUS: '#86BC25',       // Green for bus
+  UNDERGROUND: '#E63946' // Red for underground
+};
 
 /**
  * Get station symbol configuration based on transport types
@@ -14,44 +26,59 @@ export function getStationSymbol(types) {
   const hasBus = types.includes('bus');
   const hasTaxi = types.includes('taxi');
 
-  // Underground + Bus + Taxi (all three)
+  // Determine colors for semicircle and rectangle based on available modes
+  let semicircleColor = COLORS.TAXI; // Default
+  let rectangleColor = COLORS.TAXI;  // Default
+  let type = 'taxi';
+  let label = 'Taxi Only';
+  let size = 14;
+  let zIndex = 10;
+
+  // Underground + Bus + Taxi (all three modes)
   if (hasUnderground && hasBus && hasTaxi) {
-    return {
-      type: 'underground-bus-taxi',
-      color: '#E63946', // Red for underground
-      secondaryColor: '#2A9D8F', // Green for bus
-      shape: 'circle-with-square',
-      label: 'Underground + Bus + Taxi',
-      size: 18,
-      zIndex: 30
-    };
+    semicircleColor = COLORS.UNDERGROUND; // Red top
+    rectangleColor = COLORS.UNDERGROUND;  // Red bottom
+    type = 'underground-bus-taxi';
+    label = 'Underground + Bus + Taxi';
+    size = 18;
+    zIndex = 30;
+  }
+  // Bus + Taxi (two modes)
+  else if (hasBus && hasTaxi) {
+    semicircleColor = COLORS.BUS;  // Green top
+    rectangleColor = COLORS.BUS;   // Green bottom
+    type = 'bus-taxi';
+    label = 'Bus + Taxi';
+    size = 16;
+    zIndex = 20;
+  }
+  // Taxi only (one mode)
+  else if (hasTaxi) {
+    semicircleColor = COLORS.TAXI; // Yellow top
+    rectangleColor = COLORS.TAXI;  // Yellow bottom
+    type = 'taxi';
+    label = 'Taxi Only';
+    size = 14;
+    zIndex = 10;
   }
 
-  // Bus + Taxi (no underground)
-  if (hasBus && hasTaxi) {
-    return {
-      type: 'bus-taxi',
-      color: '#2A9D8F', // Green for bus
-      shape: 'square',
-      label: 'Bus + Taxi',
-      size: 15,
-      zIndex: 20
-    };
-  }
-
-  // Taxi only
   return {
-    type: 'taxi',
-    color: '#F4A261', // Yellow/Orange for taxi
-    shape: 'circle',
-    label: 'Taxi Only',
-    size: 12,
-    zIndex: 10
+    type,
+    semicircleColor,
+    rectangleColor,
+    label,
+    size,
+    zIndex
   };
 }
 
 /**
- * StationSymbol Component - Renders SVG symbols
+ * StationSymbol Component - Renders authentic Scotland Yard symbols
+ *
+ * Symbol design (as seen in real Scotland Yard board):
+ * - Top: Semicircle (half circle on top)
+ * - Bottom: Small rectangle in center
+ * - Colors indicate available transport modes
  */
 export default function StationSymbol({ station, isHovered = false }) {
   const symbol = getStationSymbol(station.types || ['taxi']);
@@ -59,138 +86,55 @@ export default function StationSymbol({ station, isHovered = false }) {
   const baseSize = symbol.size;
   const size = baseSize * scale;
 
-  // Underground + Bus + Taxi (Circle with inner dot + Square overlay)
-  if (symbol.type === 'underground-bus-taxi') {
-    return (
-      <svg
-        width={size * 2}
-        height={size * 2}
-        style={{
-          cursor: 'pointer',
-          filter: isHovered ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.6))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        {/* Outer circle (Underground - Red) */}
-        <circle
-          cx={size}
-          cy={size}
-          r={size * 0.85}
-          fill={symbol.color}
-          stroke="#8B0000"
-          strokeWidth="2.5"
-        />
-
-        {/* Inner dot (Underground indicator) */}
-        <circle
-          cx={size}
-          cy={size}
-          r={size * 0.25}
-          fill="#FFFFFF"
-          stroke="none"
-        />
-
-        {/* Small square in corner (Bus indicator - Green) */}
-        <rect
-          x={size * 1.3}
-          y={size * 0.3}
-          width={size * 0.6}
-          height={size * 0.6}
-          fill={symbol.secondaryColor}
-          stroke="#1B5E4F"
-          strokeWidth="1.5"
-          rx="2"
-        />
-
-        {/* Station number */}
-        <text
-          x={size}
-          y={size + (size * 0.05)}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#FFFFFF"
-          fontSize={size * 0.45}
-          fontWeight="bold"
-          fontFamily="Arial, sans-serif"
-          style={{ pointerEvents: 'none' }}
-        >
-          {station.id}
-        </text>
-      </svg>
-    );
-  }
-
-  // Bus + Taxi (Square - Green)
-  if (symbol.type === 'bus-taxi') {
-    return (
-      <svg
-        width={size * 2}
-        height={size * 2}
-        style={{
-          cursor: 'pointer',
-          filter: isHovered ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.6))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        {/* Square (Bus - Green) */}
-        <rect
-          x={size * 0.2}
-          y={size * 0.2}
-          width={size * 1.6}
-          height={size * 1.6}
-          fill={symbol.color}
-          stroke="#1B5E4F"
-          strokeWidth="2.5"
-          rx="3"
-        />
-
-        {/* Station number */}
-        <text
-          x={size}
-          y={size + (size * 0.05)}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fill="#FFFFFF"
-          fontSize={size * 0.5}
-          fontWeight="bold"
-          fontFamily="Arial, sans-serif"
-          style={{ pointerEvents: 'none' }}
-        >
-          {station.id}
-        </text>
-      </svg>
-    );
-  }
-
-  // Taxi only (Circle - Yellow/Orange)
+  // Authentic Scotland Yard symbol: Semicircle top + Rectangle bottom
   return (
     <svg
-      width={size * 2}
-      height={size * 2}
+      width={size * 2.2}
+      height={size * 2.4}
+      viewBox="0 0 100 110"
       style={{
         cursor: 'pointer',
         filter: isHovered ? 'drop-shadow(0 4px 8px rgba(0,0,0,0.6))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
         transition: 'all 0.2s ease'
       }}
     >
-      {/* Circle (Taxi - Yellow/Orange) */}
+      {/* Top Semicircle - colored by transport type */}
+      <path
+        d="M 20,50 A 30,30 0 0,1 80,50 Z"
+        fill={symbol.semicircleColor}
+        stroke="#1a1a1a"
+        strokeWidth="2.5"
+      />
+
+      {/* Bottom Rectangle - colored by transport type */}
+      <rect
+        x="35"
+        y="50"
+        width="30"
+        height="40"
+        fill={symbol.rectangleColor}
+        stroke="#1a1a1a"
+        strokeWidth="2.5"
+        rx="2"
+      />
+
+      {/* White background circle for station number */}
       <circle
-        cx={size}
-        cy={size}
-        r={size * 0.85}
-        fill={symbol.color}
-        stroke="#D68A45"
-        strokeWidth="2"
+        cx="50"
+        cy="55"
+        r="18"
+        fill="#FFFFFF"
+        stroke="none"
       />
 
       {/* Station number */}
       <text
-        x={size}
-        y={size + (size * 0.05)}
+        x="50"
+        y="60"
         textAnchor="middle"
         dominantBaseline="middle"
-        fill="#FFFFFF"
-        fontSize={size * 0.55}
+        fill="#1a1a1a"
+        fontSize="18"
         fontWeight="bold"
         fontFamily="Arial, sans-serif"
         style={{ pointerEvents: 'none' }}

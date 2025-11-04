@@ -431,13 +431,16 @@ function MapTest() {
                 return '🚕';
               };
 
+              // Use semicircle color for the main color
+              const mainColor = symbol.semicircleColor;
+
               return (
                 <div
                   key={station.id}
                   style={{
                     padding: '8px 10px',
-                    background: `${symbol.color}15`,
-                    border: `2px solid ${symbol.color}`,
+                    background: `${mainColor}15`,
+                    border: `2px solid ${mainColor}`,
                     borderRadius: '6px',
                     fontSize: '12px',
                     color: '#f5f5f5',
@@ -445,11 +448,11 @@ function MapTest() {
                     transition: 'all 0.2s'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `${symbol.color}30`;
+                    e.currentTarget.style.background = `${mainColor}30`;
                     e.currentTarget.style.transform = 'translateX(5px)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = `${symbol.color}15`;
+                    e.currentTarget.style.background = `${mainColor}15`;
                     e.currentTarget.style.transform = 'translateX(0)';
                   }}
                 >
@@ -462,7 +465,7 @@ function MapTest() {
                     <span style={{ fontSize: '16px' }}>{getIcon()}</span>
                     <span style={{
                       fontWeight: 'bold',
-                      color: symbol.color
+                      color: mainColor
                     }}>
                       #{station.id}
                     </span>
