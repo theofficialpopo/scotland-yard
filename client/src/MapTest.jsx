@@ -422,14 +422,22 @@ function MapTest() {
             gap: '8px'
           }}>
             {gameBoard.stations.map((station) => {
-              const style = getStationStyle(station);
+              const symbol = getStationSymbol(station.types || ['taxi']);
+
+              // Get icon based on station type
+              const getIcon = () => {
+                if (symbol.type === 'underground-bus-taxi') return '🚇';
+                if (symbol.type === 'bus-taxi') return '🚌';
+                return '🚕';
+              };
+
               return (
                 <div
                   key={station.id}
                   style={{
                     padding: '8px 10px',
-                    background: `${style.backgroundColor}15`,
-                    border: `2px solid ${style.backgroundColor}`,
+                    background: `${symbol.color}15`,
+                    border: `2px solid ${symbol.color}`,
                     borderRadius: '6px',
                     fontSize: '12px',
                     color: '#f5f5f5',
@@ -437,11 +445,11 @@ function MapTest() {
                     transition: 'all 0.2s'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = `${style.backgroundColor}30`;
+                    e.currentTarget.style.background = `${symbol.color}30`;
                     e.currentTarget.style.transform = 'translateX(5px)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = `${style.backgroundColor}15`;
+                    e.currentTarget.style.background = `${symbol.color}15`;
                     e.currentTarget.style.transform = 'translateX(0)';
                   }}
                 >
@@ -451,10 +459,10 @@ function MapTest() {
                     gap: '8px',
                     marginBottom: '4px'
                   }}>
-                    <span style={{ fontSize: '16px' }}>{style.icon}</span>
+                    <span style={{ fontSize: '16px' }}>{getIcon()}</span>
                     <span style={{
                       fontWeight: 'bold',
-                      color: style.backgroundColor
+                      color: symbol.color
                     }}>
                       #{station.id}
                     </span>
